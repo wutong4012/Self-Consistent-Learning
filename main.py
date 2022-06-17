@@ -25,6 +25,7 @@ def set_trainer(config, steps, ckpt_callback, early_stopping):
     return trainer
     
 def generator_cycle(config, gen_system):
+    torch.cuda.empty_cache()
     gen_ckpt_callback = ModelCheckpoint(
         save_top_k=1,
         monitor='gen_val_loss',
@@ -43,13 +44,13 @@ def generator_cycle(config, gen_system):
         ckpt_callback=gen_ckpt_callback, 
         early_stopping=gen_early_stopping
     )
-    
-    torch.cuda.empty_cache()
+
     gen_system.set_gen_dataset()
     gen_trainer.fit(gen_system)
     gen_system.generate_samples()
 
 def discriminator_cycle(config, dis_system):
+    
     dis_ckpt_callback = ModelCheckpoint(
         save_top_k=1,
         monitor='dis_f1_score',
@@ -69,7 +70,6 @@ def discriminator_cycle(config, dis_system):
         early_stopping=dis_early_stopping
     )
     
-    torch.cuda.empty_cache()
     dis_system.set_dis_dataset()
     dis_trainer.fit(dis_system)
     dis_system.judge_similarity()
