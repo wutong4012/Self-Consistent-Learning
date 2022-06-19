@@ -143,7 +143,7 @@ def set_dataset(config, use_label, use_gen, attri=None):
             print(f'{generated_data.num_rows} Filter Samples From Generated Data')
 
     data = data.train_test_split(
-        train_size=0.7, test_size=0.3, seed=config.seed)
+        train_size=0.8, test_size=0.2, seed=config.seed)
     train_dataset = SimGanDataset(data=data['train'])
     val_dataset = SimGanDataset(data=data['test'])
 

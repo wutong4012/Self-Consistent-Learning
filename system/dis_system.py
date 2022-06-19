@@ -24,7 +24,7 @@ class DisSystem(LightningModule):
 
     def set_dis_dataset(self):
         self.train_dataset, self.val_dataset = \
-            set_dataset(self.config, use_label=True, use_gen=False, attri='dis')
+            set_dataset(self.config, use_label=True, use_gen=True, attri='dis')
 
     def _set_tokenizers_and_models(self):
         self.dis_tokenizer = BertTokenizer.from_pretrained(self.config.discriminator)
