@@ -6,10 +6,11 @@ import datasets
 import torch
 from transformers import BertTokenizer
 
+import sys
+sys.path.append('/cognitive_comp/wutong/similarity_generation/')
 from model_utils.sim_gan_model import Discriminator
-from data_utlis.noisy_input_ids import noisy
 
-_BATCH_SIZE = 1024  # bert-2048 / els-1536
+_BATCH_SIZE = 1280  # bert-2048 / els-1280
 _DISCRIMINATOR = 'erlangshen'
 _CACHE_DATA_PATH = '/cognitive_comp/wutong/source/data_base/score_sim_data_cycle_0'
 warnings.filterwarnings('ignore')
@@ -49,8 +50,9 @@ def load_dis_model():
 
     elif _DISCRIMINATOR == 'erlangshen':
         state_dict = torch.load(
-            '/cognitive_comp/wutong/source/model_base/dis_f1=0.9998.ckpt')['state_dict']
-        new_dict = {key[len('discriminator.'):]: val for key,
+            '/cognitive_comp/wutong/source/model_base/discriminator.pt', 
+            map_location='cpu')['module']
+        new_dict = {key[len('module.discriminator.'):]: val for key,
                     val in state_dict.items()}
 
     dis_model.load_state_dict(new_dict)
@@ -71,38 +73,43 @@ def generate_arrow_cache(num_proc=1) -> None:
 
     def _generate_sim_sentence(example):
         torch.cuda.empty_cache()
-        scores = []
-        text1_ids = dis_tokenizer(
-            example['text1'], padding=True, return_tensors='pt').input_ids
-        noisy_text1_ids = noisy(x=text1_ids, drop_prob=0.05, sub_prob=0.05, shuffle_dist=0,
-                                bos_token=101, pad_token=102, vocab_size=21128)
-        nosiy_text1 = dis_tokenizer.batch_decode(
-            noisy_text1_ids, skip_special_tokens=True)
-        input_texts = []
-        for idx in range(len(nosiy_text1)):
+        scores, input_texts = [], []
+        for idx in range(len(example['text1'])):
             input_texts.append(
-                nosiy_text1[idx].replace(' ', '') + '[SEP]' + example['text2'][idx])
+                example['text1'][idx] + '[SEP]' + example['text2'][idx])
 
         input_ids = dis_tokenizer(
             input_texts, padding=True, return_tensors='pt').input_ids
         with torch.no_grad():
             logits = discriminator.forward(
                 dis_input_ids=input_ids.cuda(), labels=None)
-        scores = torch.argmax(logits, dim=1).tolist()
+            logits = torch.softmax(logits, dim=1)
 
+        scores = []
+        for item in logits:
+            if item[1] >= 0.7:
+                scores.append(1)
+            else:
+                scores.append(0)
+    
         return {'score': scores}
 
+    feats = datasets.Features({"text1": datasets.Value('string'), 
+                               "text2": datasets.Value('string'), 
+                               "score": datasets.Value('int8')})
     gen_sim_ds = sim_data.map(
         _generate_sim_sentence,
         batched=True,
         batch_size=_BATCH_SIZE,
         keep_in_memory=True,
         num_proc=num_proc,
+        features=feats,
         remove_columns=['score'])
     print(gen_sim_ds)
 
     gen_sim_ds.save_to_disk(_CACHE_DATA_PATH)
     print('done')
+
 
 if __name__ == '__main__':
     if not os.path.exists(_CACHE_DATA_PATH):

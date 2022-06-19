@@ -17,13 +17,14 @@ def set_trainer(config, steps, ckpt_callback, early_stopping):
         precision=16,
         log_every_n_steps=1,
         num_sanity_val_steps=0,
-        val_check_interval=5,
+        val_check_interval=10,
         callbacks=[lr_callback, ckpt_callback, early_stopping],
         max_steps=steps,
     )
 
     return trainer
     
+
 def generator_cycle(config, gen_system):
     torch.cuda.empty_cache()
     gen_ckpt_callback = ModelCheckpoint(
@@ -48,6 +49,7 @@ def generator_cycle(config, gen_system):
     gen_system.set_gen_dataset()
     gen_trainer.fit(gen_system)
     gen_system.generate_samples()
+
 
 def discriminator_cycle(config, dis_system):
     
@@ -90,6 +92,7 @@ def run(config):
 
         generator_cycle(config, gen_system)
         discriminator_cycle(config, dis_system)
+
 
 if __name__ == '__main__':
     run()

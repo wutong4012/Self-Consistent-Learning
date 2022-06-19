@@ -4,20 +4,23 @@ exp_dir: /cognitive_comp/wutong/similarity_generation/experiments/
 txl_config_path: /cognitive_comp/wutong/similarity_generation/model_utils/txl_5B_config.json
 
 txl_model_path: /cognitive_comp/wutong/source/model_base/txl_zh_5.0B.pt
-dis_model_path: /cognitive_comp/wutong/source/model_base/dis_f1=0.9998.ckpt
+dis_model_path: /cognitive_comp/wutong/source/model_base/discriminator.pt
 sp_model_path: /cognitive_comp/wutong/source/model_base/chinese_sentencepiece/cog-pretrain.model
 ckpt_model_path: /cognitive_comp/wutong/similarity_generation/experiments/lightning_logs/checkpoints
 
 wudao_data_path: /cognitive_comp/wutong/source/data_base/wudao_sentences
 #  _new中将一堆相似句完全相同的score设置为0 (59285条 -> 371424(Equal)+97192->495201(Bad)
-# 去掉了idea标注的数据，并且多了LCS<=3限制和最短长度5
+# 去掉了idea标注的数据，并且多了LCS<=2限制和最短长度5
 lab_data_path: /cognitive_comp/wutong/source/data_base/similarity_data/sim_cache_data_new
 gen_data_path: /cognitive_comp/wutong/source/data_base/sim_cycle_data/gen_sim_data
 score_data_path: /cognitive_comp/wutong/source/data_base/sim_cycle_data/score_sim_data
 
+dis_threshold: 0.7
+gen_anti_cyle: 5
 gen_repeat_times: 5
 sentence_num: 2560  # 每一轮需要生成的句子数
-dis_batch_size: 48 # 32 / 24
+
+dis_batch_size: 48 # 48
 gen_batch_size: 2
 learning_rate: 2e-5
 
@@ -25,9 +28,9 @@ dis_hidden_size: 1024 # 768 / 1024
 # 'bert-base-chinese' / 'IDEA-CCNL/Erlangshen-Roberta-330M-Similarity'
 discriminator: 'IDEA-CCNL/Erlangshen-Roberta-330M-Similarity'
 
-gen_train_steps: 2e6
-dis_train_steps: 1e6
-warmup_steps: 10
+gen_train_steps: 300
+dis_train_steps: 200
+warmup_steps: 20
 checkpoint_steps: 10
 cycle_nums: 50
 cycle: 0

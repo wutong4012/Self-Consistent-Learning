@@ -1,5 +1,6 @@
 import os
 import random
+import time
 
 import datasets
 import torch
@@ -52,7 +53,7 @@ class GenSystem(LightningModule):
         scheduler = get_cosine_schedule_with_warmup(
             optimizer=optimizer,
             num_warmup_steps=int(self.config.warmup_steps),
-            num_training_steps=200
+            num_training_steps=self.config.gen_train_steps
         )
 
         # Must be written strictly according to the specification! ! !
@@ -122,7 +123,7 @@ class GenSystem(LightningModule):
             output_ids_list = sample_sequence_batch(
                 model=self.generator.gen.cuda(), context_tokens_tensor=input_ids.cuda(), 
                 context_length_tensor=length_tensor, repetition_penalty=1.5, max_out_seq=200, 
-                end_token_id=50000, temperature=1.0, top_k=50, top_p=0.92
+                end_token_id=50000, temperature=1.5, top_k=0, top_p=0.82,
             )
             sim_sentence = self.gen_tokenizer.batch_decode(output_ids_list, skip_special_tokens=True)
 
@@ -134,7 +135,10 @@ class GenSystem(LightningModule):
                 item = item.replace(' ', '').split('”的相似句是“')
                 raw_text.append(item[0][1:])
                 sim_text.append(item[1][:-1])
-            score = [1] * len(raw_text)
+            if self.config.cycle < self.config.gen_anti_cyle:
+                score = [0] * len(raw_text)
+            else:
+                score = [1] * len(raw_text)
 
             return {'text1': raw_text, 'text2': sim_text, 'score': score}
 
@@ -156,3 +160,5 @@ class GenSystem(LightningModule):
         if self.global_rank == 0:
             gen_sim_ds.save_to_disk(new_data_path)
             print('gen_data: done!!!')
+        else:
+            time.sleep(10)

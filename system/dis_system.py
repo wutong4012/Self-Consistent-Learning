@@ -24,7 +24,7 @@ class DisSystem(LightningModule):
 
     def set_dis_dataset(self):
         self.train_dataset, self.val_dataset = \
-            set_dataset(self.config, use_label=True, use_gen=True, attri='dis')
+            set_dataset(self.config, use_label=True, use_gen=False, attri='dis')
 
     def _set_tokenizers_and_models(self):
         self.dis_tokenizer = BertTokenizer.from_pretrained(self.config.discriminator)
@@ -32,8 +32,8 @@ class DisSystem(LightningModule):
         
         if self.config.cycle == 0:
             state_dict = torch.load(self.config.dis_model_path, 
-                                    map_location='cpu')['state_dict']
-            new_dict = {key[len('discriminator.'):]: val for key,
+                                    map_location='cpu')['module']
+            new_dict = {key[len('module.discriminator.'):]: val for key,
                         val in state_dict.items()}
             self.discriminator.load_state_dict(new_dict)
         else:
@@ -61,7 +61,7 @@ class DisSystem(LightningModule):
         scheduler = get_cosine_schedule_with_warmup(
             optimizer=optimizer,
             num_warmup_steps=int(self.config.warmup_steps),
-            num_training_steps=200
+            num_training_steps=self.config.dis_train_steps
         )
 
         # Must be written strictly according to the specification! ! !
@@ -109,17 +109,10 @@ class DisSystem(LightningModule):
         
         def _generate_sim_sentence(example):
             torch.cuda.empty_cache()
-            scores = []
-            text1_ids = self.dis_tokenizer(
-                example['text1'], padding=True, return_tensors='pt').input_ids
-            noisy_text1_ids = noisy(x=text1_ids, drop_prob=0.05, sub_prob=0.05, shuffle_dist=0,
-                                    bos_token=101, pad_token=102, vocab_size=21128)
-            nosiy_text1 = self.dis_tokenizer.batch_decode(
-                noisy_text1_ids, skip_special_tokens=True)
-            input_texts = []
-            for idx in range(len(nosiy_text1)):
+            scores, input_texts = [], []
+            for idx in range(len(example['text1'])):
                 input_texts.append(
-                    nosiy_text1[idx].replace(' ', '') + '[SEP]' + example['text2'][idx])
+                    example['text1'][idx] + '[SEP]' + example['text2'][idx])
 
             input_ids = self.dis_tokenizer(
                 input_texts, padding=True, return_tensors='pt').input_ids
@@ -127,7 +120,14 @@ class DisSystem(LightningModule):
                 self.discriminator.to('cuda').eval()
                 logits = self.discriminator.forward(
                     dis_input_ids=input_ids.cuda(), labels=None)
-            scores = torch.argmax(logits, dim=1).tolist()
+                logits = torch.softmax(logits, dim=1)
+
+            scores = []
+            for item in logits:
+                if item[1] >= self.config.dis_threshold:
+                    scores.append(1)
+                else:
+                    scores.append(0)
 
             return {'score': scores}
 

@@ -9,11 +9,13 @@ import torch
 from transformers import T5Tokenizer
 from torch.nn.utils.rnn import pad_sequence
 
+import sys
+sys.path.append('/cognitive_comp/wutong/similarity_generation/')
 from model_utils.gpt2_for_inference import GPT2Model
 from data_utlis.sample_sequence import sample_sequence_batch
 
 
-_NUM_PART, _NUM_FILES = 1, 1
+_NUM_FILES = 1
 _WUDAO_DATA_PATH = '/cognitive_comp/wutong/source/data_base/wudao_sentences/'
 _CACHE_DATA_PATH = '/cognitive_comp/wutong/source/data_base/gen_sim_data_cycle_0'
 
@@ -75,6 +77,7 @@ def generate_arrow_cache(num_proc=1) -> None:
     print('Load model and tokenizer successfully!')
 
     def _generate_sim_sentence(example):
+        torch.cuda.empty_cache()
         sim_text = []
         input_ids, length_list = [], []
         for item in example['sentence_list']:
@@ -82,6 +85,7 @@ def generate_arrow_cache(num_proc=1) -> None:
                 continue
 
             # 每段话只随机选一条句子
+            random.seed(42)
             random_num = random.sample(range(len(item)), 1)[0]
             cur_input_ids = gen_tokenizer(
                 '<bos>“' + item[random_num] + '”的相似句是“', return_tensors='pt').input_ids.squeeze()[:-1]  # 不能加<eos>
@@ -97,7 +101,7 @@ def generate_arrow_cache(num_proc=1) -> None:
 
         output_ids_list = sample_sequence_batch(
             model=generator.cuda(), context_tokens_tensor=input_ids.cuda(), context_length_tensor=length_tensor,
-            repetition_penalty=1.5, max_out_seq=200, end_token_id=50000, temperature=1.0, top_k=50, top_p=0.92
+            repetition_penalty=1.5, max_out_seq=200, end_token_id=50000, temperature=1.5, top_k=0, top_p=0.82,
         )
         sim_sentence = gen_tokenizer.batch_decode(output_ids_list, skip_special_tokens=True)
 
@@ -115,11 +119,15 @@ def generate_arrow_cache(num_proc=1) -> None:
 
         return {'text1': raw_text, 'text2': sim_text, 'score': score}
 
+    feats = datasets.Features({"text1": datasets.Value('string'), 
+                               "text2": datasets.Value('string'), 
+                               "score": datasets.Value('int8')})
     gen_sim_ds = wudao_ds.map(
         _generate_sim_sentence,
         batched=True,
         batch_size=256,
         num_proc=num_proc,
+        features=feats,
         remove_columns=['sentence_list'])
     print(gen_sim_ds)
 
