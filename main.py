@@ -17,7 +17,7 @@ def set_trainer(config, steps, ckpt_callback, early_stopping):
         precision=16,
         log_every_n_steps=1,
         num_sanity_val_steps=0,
-        val_check_interval=10,
+        val_check_interval=9,
         callbacks=[lr_callback, ckpt_callback, early_stopping],
         max_steps=steps,
     )
@@ -86,7 +86,7 @@ def run(config):
     gen_system = GenSystem(config)
     dis_system = DisSystem(config)
     
-    for idx in range(1, config.cycle_nums):
+    for idx in range(0, config.cycle_nums):
         config.cycle = idx
         print('Cycle: {}'.format(config.cycle))
 

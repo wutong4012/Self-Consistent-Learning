@@ -15,17 +15,16 @@ lab_data_path: /cognitive_comp/wutong/source/data_base/similarity_data/sim_cache
 gen_data_path: /cognitive_comp/wutong/source/data_base/sim_cycle_data/gen_sim_data
 score_data_path: /cognitive_comp/wutong/source/data_base/sim_cycle_data/score_sim_data
 
-dis_threshold: 0.7
-gen_anti_cyle: 5
-gen_repeat_times: 5
+dis_threshold: 0.7  # Discriminator选择为1的阈值
+gen_anti_cyle: 5  #  刚开始先对抗的轮数
+gen_repeat_times: 5  # 每条句子重复生成的次数
 sentence_num: 2560  # 每一轮需要生成的句子数
 
-dis_batch_size: 32
+dis_batch_size: 48
 gen_batch_size: 2
 learning_rate: 2e-5
 
-dis_hidden_size: 1024 # 768 / 1024
-# 'bert-base-chinese' / 'IDEA-CCNL/Erlangshen-Roberta-330M-Similarity'
+dis_hidden_size: 1024
 discriminator: 'IDEA-CCNL/Erlangshen-Roberta-330M-Similarity'
 
 gen_train_steps: 1000
@@ -33,4 +32,4 @@ dis_train_steps: 500
 warmup_steps: 50
 checkpoint_steps: 10
 cycle_nums: 50
-cycle: 1
+cycle: 0

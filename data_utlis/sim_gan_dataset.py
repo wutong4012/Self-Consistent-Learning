@@ -120,6 +120,7 @@ def set_dataset(config, use_label, use_gen, attri=None):
                 positived_data = positived_data.select(range(generated_data.num_rows))
                 data = datasets.concatenate_datasets(
                     [part_labeled_data, generated_data, positived_data])
+                
             else:
                 def filter_fn(example, idx):
                     return ((idx <= start) or (idx >= end)) and (example['score'] == 0)
@@ -127,6 +128,7 @@ def set_dataset(config, use_label, use_gen, attri=None):
                 negtived_data = negtived_data.select(range(generated_data.num_rows))
                 data = datasets.concatenate_datasets(
                     [part_labeled_data, generated_data, negtived_data])
+                
             print('From Generated Data Positive Samples: ', generated_data.filter(
                 lambda example: example['score'] == 1).num_rows)
             print('From Generated Data Negtive Samples: ', generated_data.filter(
@@ -154,7 +156,7 @@ def set_dataset(config, use_label, use_gen, attri=None):
 
 def create_dataloader(config, dataset, tokenizer, attri='gen', shuffle=True):
     if attri == 'dis':
-        batch_size = 160
+        batch_size = 50
 
         def collate_fn(batch_data):
             return discriminator_collate_fn(

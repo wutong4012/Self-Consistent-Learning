@@ -94,7 +94,6 @@ class GenSystem(LightningModule):
         
         def _generate_sim_sentence(example):
             torch.cuda.empty_cache()
-            sim_text = []
             input_ids, length_list = [], []
             for item in example['sentence_list']:
                 if len(input_ids) >= (
@@ -136,11 +135,11 @@ class GenSystem(LightningModule):
                 raw_text.append(item[0][1:])
                 sim_text.append(item[1][:-1])
             if self.config.cycle < self.config.gen_anti_cyle:
-                score = [0] * len(raw_text)
-            else:
-                score = [1] * len(raw_text)
+                scores = [0] * len(raw_text)
+            elif self.config.cycle >= self.config.gen_anti_cyle:
+                scores = [1] * len(raw_text)
 
-            return {'text1': raw_text, 'text2': sim_text, 'score': score}
+            return {'text1': raw_text, 'text2': sim_text, 'score': scores}
 
         feats = datasets.Features({"text1": datasets.Value('string'), 
                                     "text2": datasets.Value('string'), 
