@@ -127,10 +127,13 @@ def set_dataset(config, use_label, use_gen, attri=None):
                 negtived_data = negtived_data.select(range(generated_data.num_rows))
                 data = datasets.concatenate_datasets(
                     [part_labeled_data, generated_data, negtived_data])
-            print(data)
-            print('Positive Samples: ', data.filter(
+            print('From Generated Data Positive Samples: ', generated_data.filter(
                 lambda example: example['score'] == 1).num_rows)
-            print('Negtive Samples: ', data.filter(
+            print('From Generated Data Negtive Samples: ', generated_data.filter(
+                lambda example: example['score'] == 0).num_rows)
+            print('All Positive Samples: ', data.filter(
+                lambda example: example['score'] == 1).num_rows)
+            print('All Negtive Samples: ', data.filter(
                 lambda example: example['score'] == 0).num_rows)
             
         elif attri == 'gen':
@@ -138,8 +141,7 @@ def set_dataset(config, use_label, use_gen, attri=None):
             generated_data = generated_data.filter(lambda example: example['score'] == 1)
             data = datasets.concatenate_datasets(
                 [part_labeled_data, generated_data])
-            print(data)
-            print(f'{part_labeled_data.num_rows} Filter Samples From Labeled Data')
+            print(f'All Gen-Data Samples is {data.num_rows}')
             print(f'{generated_data.num_rows} Filter Samples From Generated Data')
 
     data = data.train_test_split(

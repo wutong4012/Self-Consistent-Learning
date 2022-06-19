@@ -20,7 +20,7 @@ gen_anti_cyle: 5
 gen_repeat_times: 5
 sentence_num: 2560  # 每一轮需要生成的句子数
 
-dis_batch_size: 48 # 48
+dis_batch_size: 32
 gen_batch_size: 2
 learning_rate: 2e-5
 
@@ -28,9 +28,9 @@ dis_hidden_size: 1024 # 768 / 1024
 # 'bert-base-chinese' / 'IDEA-CCNL/Erlangshen-Roberta-330M-Similarity'
 discriminator: 'IDEA-CCNL/Erlangshen-Roberta-330M-Similarity'
 
-gen_train_steps: 300
-dis_train_steps: 200
-warmup_steps: 20
+gen_train_steps: 1000
+dis_train_steps: 500
+warmup_steps: 50
 checkpoint_steps: 10
 cycle_nums: 50
-cycle: 0
+cycle: 1

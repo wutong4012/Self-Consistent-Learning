@@ -137,7 +137,7 @@ class DisSystem(LightningModule):
             batch_size=1536,
             keep_in_memory=True,
             num_proc=1)
-        print(score_sim_ds)
+        print(f'Score Data Samples is {score_sim_ds.num_rows}')
 
         new_data_path = self.config.score_data_path + f'_cycle_{self.config.cycle + 1}'
         if not os.path.exists(new_data_path):

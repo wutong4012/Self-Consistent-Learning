@@ -152,7 +152,7 @@ class GenSystem(LightningModule):
             num_proc=1,
             features=feats,
             remove_columns=['sentence_list'])
-        print(gen_sim_ds)
+        print(f'Generate Data Samples is {gen_sim_ds.num_rows}')
 
         new_data_path = self.config.gen_data_path + f'_cycle_{self.config.cycle + 1}'
         if not os.path.exists(new_data_path):
