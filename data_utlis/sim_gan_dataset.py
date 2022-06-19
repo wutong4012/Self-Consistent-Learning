@@ -72,20 +72,21 @@ def load_data(config, is_labeled=False, is_wudao=False, is_score=False, attri=No
                 if delta <= 1:
                     example['score'] = -2
                 elif delta <= 2 and attri == 'gen':
-                    example['score'] = 0
+                    example['score'] = -3
             return example
         sim_dataset = sim_dataset.map(process_equal)
         
         if attri == 'dis':
-            cnt = sim_dataset.filter(lambda example: example['score'] == 0).num_rows
-            print(f'There are {cnt} Equal Sentence!')
             cnt = sim_dataset.filter(lambda example: example['score'] == -1).num_rows
             print(f'There are {cnt} Short(<=10) Sentence!')
             cnt = sim_dataset.filter(lambda example: example['score'] == -2).num_rows
             print(f'There are {cnt} Bad Sentence!')
-        
-        sim_dataset = sim_dataset.filter(lambda example: example['score'] != -1)
-        sim_dataset = sim_dataset.filter(lambda example: example['score'] != -2)
+            sim_dataset = sim_dataset.filter(lambda example: example['score'] != -1)
+            sim_dataset = sim_dataset.filter(lambda example: example['score'] != -2)
+            
+        elif attri == 'gen':
+            cnt = sim_dataset.filter(lambda example: example['score'] == -3).num_rows
+            print(f'There are {cnt} Equal Sentence!')
 
     return sim_dataset
 
@@ -126,6 +127,7 @@ def set_dataset(config, use_label, use_gen, attri=None):
                 negtived_data = negtived_data.select(range(generated_data.num_rows))
                 data = datasets.concatenate_datasets(
                     [part_labeled_data, generated_data, negtived_data])
+            print(data)
             print('Positive Samples: ', data.filter(
                 lambda example: example['score'] == 1).num_rows)
             print('Negtive Samples: ', data.filter(
@@ -136,6 +138,7 @@ def set_dataset(config, use_label, use_gen, attri=None):
             generated_data = generated_data.filter(lambda example: example['score'] == 1)
             data = datasets.concatenate_datasets(
                 [part_labeled_data, generated_data])
+            print(data)
             print(f'{part_labeled_data.num_rows} Filter Samples From Labeled Data')
             print(f'{generated_data.num_rows} Filter Samples From Generated Data')
 
