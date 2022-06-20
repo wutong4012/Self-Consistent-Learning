@@ -11,10 +11,6 @@ from system.dis_system import DisSystem
 
 def set_trainer(config, steps, ckpt_callback, early_stopping, batch_size):
     lr_callback = LearningRateMonitor(logging_interval='step')
-    if config.cycle < config.gen_anti_cyle:
-        val_num = 5
-    else:
-        val_num = 20
     trainer = Trainer(
         default_root_dir=config.exp_dir,
         gpus=8,
@@ -24,7 +20,7 @@ def set_trainer(config, steps, ckpt_callback, early_stopping, batch_size):
         precision=16,
         log_every_n_steps=1,
         num_sanity_val_steps=0,
-        val_check_interval=val_num,
+        check_val_every_n_epoch=1,
         callbacks=[lr_callback, ckpt_callback, early_stopping],
         max_steps=steps,
     )

@@ -22,7 +22,7 @@ gen_repeat_times: 4  # 每条句子重复生成的次数
 sentence_num: 1024  # 每一轮需要生成的句子数
 
 dis_batch_size: 56
-gen_batch_size: 3
+gen_batch_size: 2
 learning_rate: 2e-5
 
 dis_hidden_size: 1024
