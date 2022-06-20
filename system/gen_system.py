@@ -95,7 +95,6 @@ class GenSystem(LightningModule):
             print('Staring Generating...')
         wudao_data = load_data(
             self.config, rank=self.global_rank, is_wudao=True)
-        print(f'There are {wudao_data.num_rows} Wudao Data!')
         new_data_path = self.config.gen_data_path + \
             f'_cycle_{self.config.cycle + 1}'
         if not os.path.exists(new_data_path):
@@ -164,7 +163,7 @@ class GenSystem(LightningModule):
             batch_size=128,
             num_proc=1,
             features=feats,
-            cache_file_name=new_data_path + '/cache',
+            cache_file_name=new_data_path + '/main_cache',
             remove_columns=['sentence_list'])
         
         if self.global_rank == 0:

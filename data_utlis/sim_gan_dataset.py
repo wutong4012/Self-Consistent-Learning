@@ -197,8 +197,8 @@ def set_dataset(config, use_label, use_gen, rank, attri=None):
 
     data = data.train_test_split(
         train_size=0.8, test_size=0.2, seed=config.seed,
-        train_indices_cache_file_name=config.cache_data_path+'/train'+str(config.cycle),
-        test_indices_cache_file_name=config.cache_data_path+'/test'+str(config.cycle))
+        train_indices_cache_file_name=config.cache_data_path+'/train'+attri+str(config.cycle),
+        test_indices_cache_file_name=config.cache_data_path+'/test'+attri+str(config.cycle))
     train_dataset = SimGanDataset(data=data['train'])
     val_dataset = SimGanDataset(data=data['test'])
 
@@ -207,14 +207,14 @@ def set_dataset(config, use_label, use_gen, rank, attri=None):
 
 def create_dataloader(config, dataset, tokenizer, attri='gen', shuffle=True):
     if attri == 'dis':
-        batch_size = 40
+        batch_size = config.dis_batch_size
 
         def collate_fn(batch_data):
             return discriminator_collate_fn(
-                batch_data, tokenizer, config.dis_batch_size, is_train=shuffle)
+                batch_data, tokenizer, is_train=shuffle)
 
     elif attri == 'gen':
-        batch_size = 30
+        batch_size = 45
 
         def collate_fn(batch_data):
             return generator_collate_fn(

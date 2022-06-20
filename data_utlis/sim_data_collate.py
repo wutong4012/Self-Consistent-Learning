@@ -102,16 +102,13 @@ def generator_collate_fn(batch_data, tokenizer, real_batch_size, is_train):
     }
 
 
-def discriminator_collate_fn(batch_data, tokenizer, real_batch_size, is_train):
+def discriminator_collate_fn(batch_data, tokenizer, is_train):
     """
         data: [CLS]<第一句>[SEP]<第二句>[SEP]
         label: 0/1
     """
     dis_text_input_ids, labels = [], []
     for item in batch_data:
-        if len(dis_text_input_ids) >= real_batch_size:
-            break
-
         if is_train:
             text1 = tokenizer(item['text1'], return_tensors='pt').input_ids
             masked_text1 = mask_tokens(
@@ -135,5 +132,5 @@ def discriminator_collate_fn(batch_data, tokenizer, real_batch_size, is_train):
 
     return {
         'dis_text_input_ids': dis_text_input_ids,
-        'labels': torch.stack(labels).unsqueeze(1),
+        'labels': torch.stack(labels),
     }

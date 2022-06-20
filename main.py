@@ -1,23 +1,26 @@
 import hydra
 import torch
 from pytorch_lightning import Trainer, seed_everything
+from pytorch_lightning.strategies.deepspeed import DeepSpeedStrategy
 from pytorch_lightning.callbacks import (LearningRateMonitor, ModelCheckpoint,
                                          EarlyStopping)
 
 from system.gen_system import GenSystem
 from system.dis_system import DisSystem            
             
-    
-def set_trainer(config, steps, ckpt_callback, early_stopping):
+
+def set_trainer(config, steps, ckpt_callback, early_stopping, batch_size):
     lr_callback = LearningRateMonitor(logging_interval='step')
     if config.cycle < config.gen_anti_cyle:
-        val_num = 10
+        val_num = 5
     else:
-        val_num = 25
+        val_num = 20
     trainer = Trainer(
         default_root_dir=config.exp_dir,
         gpus=8,
-        strategy='deepspeed_stage_2_offload',
+        strategy=DeepSpeedStrategy(
+            offload_optimizer=True,
+            logging_batch_size_per_gpu=batch_size),
         precision=16,
         log_every_n_steps=1,
         num_sanity_val_steps=0,
@@ -47,7 +50,8 @@ def generator_cycle(config, gen_system):
         config=config,
         steps=int(config.gen_train_steps), 
         ckpt_callback=gen_ckpt_callback, 
-        early_stopping=gen_early_stopping
+        early_stopping=gen_early_stopping,
+        batch_size=config.gen_batch_size
     )
 
     gen_trainer.fit(gen_system)
@@ -72,7 +76,8 @@ def discriminator_cycle(config, dis_system):
         config=config,
         steps=int(config.dis_train_steps),
         ckpt_callback=dis_ckpt_callback,
-        early_stopping=dis_early_stopping
+        early_stopping=dis_early_stopping,
+        batch_size=config.dis_batch_size
     )
     
     dis_trainer.fit(dis_system)
@@ -88,7 +93,7 @@ def run(config):
     gen_system = GenSystem(config)
     dis_system = DisSystem(config)
     
-    for idx in range(1, config.cycle_nums):
+    for idx in range(0, config.cycle_nums):
         config.cycle = idx
         print('Cycle: {}'.format(config.cycle))
 

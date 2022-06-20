@@ -100,7 +100,7 @@ class DisSystem(LightningModule):
 
         predictions = torch.argmax(logits, dim=1)
         f1_score = self.f1_metric.compute(
-            references=batch['labels'].squeeze().cuda(),
+            references=batch['labels'],
             predictions=predictions
         )
         self.log('dis_f1_score', f1_score['f1'])
@@ -150,7 +150,7 @@ class DisSystem(LightningModule):
             num_proc=1,
             cache_file_name=new_data_path + '/raw_cache')
         score_sim_ds = score_sim_ds.filter(lambda example: example['score'] != -5,
-                                            cache_file_name=new_data_path+'/cache')
+                                           cache_file_name=new_data_path+'/main_cache')
         
         if self.global_rank == 0:
             print(f'Score Data Samples is {score_sim_ds.num_rows}')
