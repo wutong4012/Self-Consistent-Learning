@@ -34,7 +34,7 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
         wudao_ds = datasets.load_from_disk(data_path)
         if wudao_ds.num_rows > config.sentence_num * 2:
             wudao_ds = wudao_ds.select(
-                range(config.sentence_num * config.gen_repeat_times * 2))
+                range(config.sentence_num * 2))
         return wudao_ds
 
     if is_labeled:  # 1590792 -> 1488200 -> 1391008

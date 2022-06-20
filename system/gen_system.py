@@ -127,10 +127,14 @@ class GenSystem(LightningModule):
                 [x for x in input_ids], batch_first=True, padding_value=50000)
             length_tensor = torch.tensor(length_list)
 
+            if self.config.cycle < self.config.gen_anti_cyle:
+                top_k, top_p = 0, 0.82
+            else:
+                top_k, top_p = 100, 0.92
             output_ids_list = sample_sequence_batch(
                 model=self.generator.gen.cuda(), context_tokens_tensor=input_ids.cuda(),
                 context_length_tensor=length_tensor, repetition_penalty=1.5, max_out_seq=200,
-                end_token_id=50000, temperature=1.5, top_k=0, top_p=0.82,
+                end_token_id=50000, temperature=1.5, top_k=top_k, top_p=top_p,
             )
             sim_sentence = self.gen_tokenizer.batch_decode(
                 output_ids_list, skip_special_tokens=True)
