@@ -214,7 +214,7 @@ def create_dataloader(config, dataset, tokenizer, attri='gen', shuffle=True):
                 batch_data, tokenizer, is_train=shuffle)
 
     elif attri == 'gen':
-        batch_size = 45
+        batch_size = config.gen_big_batch_size
 
         def collate_fn(batch_data):
             return generator_collate_fn(

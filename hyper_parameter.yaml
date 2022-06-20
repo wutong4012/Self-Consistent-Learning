@@ -21,8 +21,9 @@ gen_anti_cyle: 5  #  刚开始先对抗的轮数
 gen_repeat_times: 4  # 每条句子重复生成的次数
 sentence_num: 1024  # 每一轮需要生成的句子数
 
-dis_batch_size: 56
+dis_batch_size: 64
 gen_batch_size: 2
+gen_big_batch_size: 30
 learning_rate: 2e-5
 
 dis_hidden_size: 1024

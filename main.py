@@ -15,7 +15,7 @@ def set_trainer(config, steps, ckpt_callback, early_stopping, batch_size):
         default_root_dir=config.exp_dir,
         gpus=8,
         strategy=DeepSpeedStrategy(
-            offload_optimizer=True,
+            offload_optimizer=False,
             logging_batch_size_per_gpu=batch_size),
         precision=16,
         log_every_n_steps=1,
