@@ -1,8 +1,8 @@
 import glob
 import random
+import torch
 import datasets
 from torch.utils.data import DataLoader, Dataset
-from pytorch_lightning.utilities import rank_zero_only
 
 from data_utlis.sim_data_collate import (discriminator_collate_fn,
                                          generator_collate_fn)
@@ -25,11 +25,15 @@ class SimGanDataset(Dataset):
         return self.data.num_rows
 
 
-def load_data(config, is_labeled=False, is_wudao=False, is_score=False, attri=None):
+def load_data(config, rank, is_labeled=False, is_wudao=False, 
+              is_score=False, attri=None):
     if is_wudao:
         cache_dict_paths = glob.glob(config.wudao_data_path + '/*')
         data_path = cache_dict_paths[config.cycle]
         wudao_ds = datasets.load_from_disk(data_path)
+        if wudao_ds.num_rows > config.sentence_num * config.gen_repeat_times * 2:
+            wudao_ds = wudao_ds.select(
+                range(config.sentence_num * config.gen_repeat_times * 2))
         return wudao_ds
         
     if is_labeled:  # 1590792 -> 1488200 -> 1391008
@@ -74,49 +78,71 @@ def load_data(config, is_labeled=False, is_wudao=False, is_score=False, attri=No
                 elif delta <= 2 and attri == 'gen':
                     example['score'] = -3
             return example
-        sim_dataset = sim_dataset.map(process_equal)
+        sim_dataset = sim_dataset.map(
+            process_equal,
+            cache_file_name=data_path+'/map_cache')
         
         if attri == 'dis':
-            cnt = sim_dataset.filter(lambda example: example['score'] == -1).num_rows
-            print(f'There are {cnt} Short(<=10) Sentence!')
-            cnt = sim_dataset.filter(lambda example: example['score'] == -2).num_rows
-            print(f'There are {cnt} Bad Sentence!')
-            sim_dataset = sim_dataset.filter(lambda example: example['score'] != -1)
-            sim_dataset = sim_dataset.filter(lambda example: example['score'] != -2)
+            if rank == 0:
+                cnt = sim_dataset.filter(lambda example: example['score'] == -1,
+                                        cache_file_name=data_path+'/short_cache').num_rows
+                print(f'There are {cnt} Short(<=10) Sentence!')
+                cnt = sim_dataset.filter(lambda example: example['score'] == -2,
+                                        cache_file_name=data_path+'/bad_cache').num_rows
+                print(f'There are {cnt} Bad Sentence!')
+                torch.distributed.barrier()
+            else:
+                torch.distributed.barrier()
+                
+            sim_dataset = sim_dataset.filter(lambda example: example['score'] != -1,
+                                             cache_file_name=data_path+'/del_short_cache')
+            sim_dataset = sim_dataset.filter(lambda example: example['score'] != -2,
+                                             cache_file_name=data_path+'/del_bad_cache')
             
         elif attri == 'gen':
-            cnt = sim_dataset.filter(lambda example: example['score'] == -3).num_rows
-            print(f'There are {cnt} Equal Sentence!')
+            if rank == 0:
+                cnt = sim_dataset.filter(lambda example: example['score'] == -3,
+                                        cache_file_name=data_path+'/equal_cache').num_rows
+                print(f'There are {cnt} Equal Sentence!')
+                torch.distributed.barrier()
+            else:
+                torch.distributed.barrier()
 
     return sim_dataset
 
 
-def set_dataset(config, use_label, use_gen, attri=None):
+def set_dataset(config, use_label, use_gen, rank, attri=None):
     if use_label and not use_gen:
-        data = load_data(config, is_labeled=True)
+        data = load_data(config, rank, is_labeled=True)
     elif use_gen and not use_label:
-        data = load_data(config, is_labeled=False, attri=attri)
+        data = load_data(config, rank, is_labeled=False, attri=attri)
     elif use_gen and use_label:
-        labeled_data = load_data(config, is_labeled=True)
-        generated_data = load_data(config, is_labeled=False, attri=attri)
+        labeled_data = load_data(config, rank, is_labeled=True)
+        generated_data = load_data(config, rank, is_labeled=False, attri=attri)
 
         start, end = (config.cycle * generated_data.num_rows * 2), (
             (config.cycle + 1) * generated_data.num_rows * 2)
         part_labeled_data = labeled_data.select(range(start, end))
         
-        random_list = random.sample(range(part_labeled_data.num_rows), 10)
-        for i in random_list:
-            print('Labeled Examples: {}'.format(part_labeled_data[i]))
-        random_list = random.sample(range(generated_data.num_rows), 10)
-        for i in random_list:
-            print('Generated Examples: {}'.format(generated_data[i]))
+        if rank == 0:
+            random_list = random.sample(range(part_labeled_data.num_rows), 10)
+            for i in random_list:
+                print('Labeled Examples: {}'.format(part_labeled_data[i]))
+            random_list = random.sample(range(generated_data.num_rows), 10)
+            for i in random_list:
+                print('Generated Examples: {}'.format(generated_data[i]))
+            torch.distributed.barrier()
+        else:
+            torch.distributed.barrier()
         
         if attri == 'dis':
             assert part_labeled_data.features.type == generated_data.features.type
             if config.cycle < config.gen_anti_cyle:
                 def filter_fn(example, idx):
                     return ((idx <= start) or (idx >= end)) and (example['score'] == 1)
-                positived_data = labeled_data.filter(filter_fn, with_indices=True)
+                positived_data = labeled_data.filter(
+                    filter_fn, with_indices=True,
+                    cache_file_name=config.cache_data_path+'/lab_pos_cache_'+str(config.cycle))
                 positived_data = positived_data.select(range(generated_data.num_rows))
                 data = datasets.concatenate_datasets(
                     [part_labeled_data, generated_data, positived_data])
@@ -124,30 +150,51 @@ def set_dataset(config, use_label, use_gen, attri=None):
             else:
                 def filter_fn(example, idx):
                     return ((idx <= start) or (idx >= end)) and (example['score'] == 0)
-                negtived_data = labeled_data.filter(filter_fn, with_indices=True)
+                negtived_data = labeled_data.filter(
+                    filter_fn, with_indices=True,
+                    cache_file_name=config.cache_data_path+'/lab_neg_cache_'+str(config.cycle))
                 negtived_data = negtived_data.select(range(generated_data.num_rows))
                 data = datasets.concatenate_datasets(
                     [part_labeled_data, generated_data, negtived_data])
-                
-            print('From Generated Data Positive Samples: ', generated_data.filter(
-                lambda example: example['score'] == 1).num_rows)
-            print('From Generated Data Negtive Samples: ', generated_data.filter(
-                lambda example: example['score'] == 0).num_rows)
-            print('All Positive Samples: ', data.filter(
-                lambda example: example['score'] == 1).num_rows)
-            print('All Negtive Samples: ', data.filter(
-                lambda example: example['score'] == 0).num_rows)
+            
+            if rank == 0:  
+                print('From Generated Data Positive Samples: ', generated_data.filter(
+                    lambda example: example['score'] == 1,
+                    cache_file_name=config.cache_data_path+'/gen_pos_cache_'+str(config.cycle)).num_rows)
+                print('From Generated Data Negtive Samples: ', generated_data.filter(
+                    lambda example: example['score'] == 0,
+                    cache_file_name=config.cache_data_path+'/gen_neg_cache_'+str(config.cycle)).num_rows)
+                print('All Positive Samples: ', data.filter(
+                    lambda example: example['score'] == 1,
+                    cache_file_name=config.cache_data_path+'/all_pos_cache_'+str(config.cycle)).num_rows)
+                print('All Negtive Samples: ', data.filter(
+                    lambda example: example['score'] == 0,
+                    cache_file_name=config.cache_data_path+'/all_neg_cache_'+str(config.cycle)).num_rows)
+                torch.distributed.barrier()
+            else:
+                torch.distributed.barrier()
             
         elif attri == 'gen':
-            part_labeled_data = part_labeled_data.filter(lambda example: example['score'] == 1)
-            generated_data = generated_data.filter(lambda example: example['score'] == 1)
+            part_labeled_data = part_labeled_data.filter(
+                lambda example: example['score'] == 1,
+                cache_file_name=config.cache_data_path+'/lab2gen_cache_'+str(config.cycle))
+            generated_data = generated_data.filter(
+                lambda example: example['score'] == 1,
+                cache_file_name=config.cache_data_path+'/gen2gen_cache_'+str(config.cycle))
             data = datasets.concatenate_datasets(
                 [part_labeled_data, generated_data])
-            print(f'All Gen-Data Samples is {data.num_rows}')
-            print(f'{generated_data.num_rows} Filter Samples From Generated Data')
+
+            if rank == 0:
+                print(f'All Gen-Data Samples is {data.num_rows}')
+                print(f'{generated_data.num_rows} Filter Samples From Generated Data')
+                torch.distributed.barrier()
+            else:
+                torch.distributed.barrier()
 
     data = data.train_test_split(
-        train_size=0.8, test_size=0.2, seed=config.seed)
+        train_size=0.8, test_size=0.2, seed=config.seed,
+        train_indices_cache_file_name=config.cache_data_path+'/train'+str(config.cycle),
+        test_indices_cache_file_name=config.cache_data_path+'/test'+str(config.cycle))
     train_dataset = SimGanDataset(data=data['train'])
     val_dataset = SimGanDataset(data=data['test'])
 
@@ -156,7 +203,7 @@ def set_dataset(config, use_label, use_gen, attri=None):
 
 def create_dataloader(config, dataset, tokenizer, attri='gen', shuffle=True):
     if attri == 'dis':
-        batch_size = 50
+        batch_size = 40
 
         def collate_fn(batch_data):
             return discriminator_collate_fn(

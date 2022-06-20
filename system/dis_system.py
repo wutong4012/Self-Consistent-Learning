@@ -1,5 +1,4 @@
 import os
-import time
 import evaluate
 import torch
 from pytorch_lightning import LightningModule
@@ -8,7 +7,7 @@ from transformers.optimization import AdamW, get_cosine_schedule_with_warmup
 
 from data_utlis.sim_gan_dataset import (create_dataloader, load_data,
                                         set_dataset)
-from data_utlis.noisy_input_ids import noisy
+from system.utils import torch_distributed_zero_first
 from model_utils.sim_gan_model import Discriminator
 
 
@@ -24,7 +23,8 @@ class DisSystem(LightningModule):
 
     def set_dis_dataset(self):
         self.train_dataset, self.val_dataset = \
-            set_dataset(self.config, use_label=True, use_gen=True, attri='dis')
+            set_dataset(self.config, use_label=True, use_gen=True, 
+                        rank=self.global_rank, attri='dis')
 
     def _set_tokenizers_and_models(self):
         self.dis_tokenizer = BertTokenizer.from_pretrained(self.config.discriminator)
@@ -46,12 +46,15 @@ class DisSystem(LightningModule):
         print(f'Cycle {self.config.cycle}: The Discriminator Erlangshen Load Successfully !\n')
 
     def train_dataloader(self):
-        return create_dataloader(config=self.config, dataset=self.train_dataset,
-                                 tokenizer=self.dis_tokenizer, attri='dis', shuffle=True)
+        with torch_distributed_zero_first(self.global_rank):
+            self.set_dis_dataset()
+            return create_dataloader(config=self.config, dataset=self.train_dataset,
+                                    tokenizer=self.dis_tokenizer, attri='dis', shuffle=True)
 
     def val_dataloader(self):
-        return create_dataloader(config=self.config, dataset=self.val_dataset,
-                                 tokenizer=self.dis_tokenizer, attri='dis', shuffle=False)
+        with torch_distributed_zero_first(self.global_rank):
+            return create_dataloader(config=self.config, dataset=self.val_dataset,
+                                    tokenizer=self.dis_tokenizer, attri='dis', shuffle=False)
 
     def configure_optimizers(self):
         optimizer = AdamW(
@@ -104,46 +107,50 @@ class DisSystem(LightningModule):
     def judge_similarity(self):
         if self.global_rank == 0:
             print('Staring Scoring...')
-        generated_data = load_data(self.config, is_labeled=False, 
-                                   is_score=True, attri='dis')
-        
-        def _generate_sim_sentence(example):
-            torch.cuda.empty_cache()
-            scores, input_texts = [], []
-            for idx in range(len(example['text1'])):
-                input_texts.append(
-                    example['text1'][idx] + '[SEP]' + example['text2'][idx])
+            generated_data = load_data(self.config, rank=self.global_rank, is_labeled=False, 
+                                       is_score=True, attri='dis')
+            new_data_path = self.config.score_data_path + f'_cycle_{self.config.cycle + 1}'
+            if not os.path.exists(new_data_path):
+                os.makedirs(new_data_path)
+            
+            def _generate_sim_sentence(example):
+                torch.cuda.empty_cache()
+                scores, input_texts = [], []
+                for idx in range(len(example['text1'])):
+                    input_texts.append(
+                        example['text1'][idx] + '[SEP]' + example['text2'][idx])
 
-            input_ids = self.dis_tokenizer(
-                input_texts, padding=True, return_tensors='pt').input_ids
-            with torch.no_grad():
-                self.discriminator.to('cuda').eval()
-                logits = self.discriminator.forward(
-                    dis_input_ids=input_ids.cuda(), labels=None)
-                logits = torch.softmax(logits, dim=1)
+                input_ids = self.dis_tokenizer(
+                    input_texts, padding=True, return_tensors='pt').input_ids
+                with torch.no_grad():
+                    self.discriminator.to('cuda').eval()
+                    logits = self.discriminator.forward(
+                        dis_input_ids=input_ids.cuda(), labels=None)
+                    logits = torch.softmax(logits, dim=1)
 
-            scores = []
-            for item in logits:
-                if item[1] >= self.config.dis_threshold:
-                    scores.append(1)
-                else:
-                    scores.append(0)
+                assert len(example['text1']) == logits.size(0)
+                for idx, item in enumerate(logits):
+                    if item[1] >= self.config.dis_threshold:
+                        example['score'][idx] = 1
+                    elif item[0] >= self.config.dis_threshold:
+                        example['score'][idx] = 0
+                    else:
+                        example['score'][idx] = -5
 
-            return {'score': scores}
+                return example
 
-        score_sim_ds = generated_data.map(
-            _generate_sim_sentence,
-            batched=True,
-            batch_size=1536,
-            keep_in_memory=True,
-            num_proc=1)
-        print(f'Score Data Samples is {score_sim_ds.num_rows}')
-
-        new_data_path = self.config.score_data_path + f'_cycle_{self.config.cycle + 1}'
-        if not os.path.exists(new_data_path):
-            os.makedirs(new_data_path)
-        if self.global_rank == 0:
+            score_sim_ds = generated_data.map(
+                _generate_sim_sentence,
+                batched=True,
+                batch_size=1536,
+                num_proc=1,
+                cache_file_name=new_data_path + '/raw_cache')
+            score_sim_ds = score_sim_ds.filter(lambda example: example['score'] != -5,
+                                            cache_file_name=new_data_path + '/cache')
+            print(f'Score Data Samples is {score_sim_ds.num_rows}')
+            
             score_sim_ds.save_to_disk(new_data_path)
             print('score_data: done!!!')
+            torch.distributed.barrier()
         else:
-            time.sleep(15)
+            torch.distributed.barrier()

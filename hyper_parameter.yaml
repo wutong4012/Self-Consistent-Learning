@@ -14,22 +14,23 @@ wudao_data_path: /cognitive_comp/wutong/source/data_base/wudao_sentences
 lab_data_path: /cognitive_comp/wutong/source/data_base/similarity_data/sim_cache_data_new
 gen_data_path: /cognitive_comp/wutong/source/data_base/sim_cycle_data/gen_sim_data
 score_data_path: /cognitive_comp/wutong/source/data_base/sim_cycle_data/score_sim_data
+cache_data_path: /cognitive_comp/wutong/source/data_base/sim_cycle_cache
 
-dis_threshold: 0.7  # Discriminator选择为1的阈值
+dis_threshold: 0.7  # Discriminator选择为0/1的阈值
 gen_anti_cyle: 5  #  刚开始先对抗的轮数
-gen_repeat_times: 5  # 每条句子重复生成的次数
-sentence_num: 2560  # 每一轮需要生成的句子数
+gen_repeat_times: 4  # 每条句子重复生成的次数
+sentence_num: 1024  # 每一轮需要生成的句子数
 
-dis_batch_size: 48
+dis_batch_size: 32
 gen_batch_size: 2
 learning_rate: 2e-5
 
 dis_hidden_size: 1024
 discriminator: 'IDEA-CCNL/Erlangshen-Roberta-330M-Similarity'
 
-gen_train_steps: 1000
+gen_train_steps: 500
 dis_train_steps: 500
 warmup_steps: 50
 checkpoint_steps: 10
 cycle_nums: 50
-cycle: 0
+cycle: 1
