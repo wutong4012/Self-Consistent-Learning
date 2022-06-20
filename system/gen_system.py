@@ -93,77 +93,77 @@ class GenSystem(LightningModule):
     def generate_samples(self):
         if self.global_rank == 0:
             print('Staring Generating...')
-            wudao_data = load_data(
-                self.config, rank=self.global_rank, is_wudao=True)
-            new_data_path = self.config.gen_data_path + \
-                f'_cycle_{self.config.cycle + 1}'
-            if not os.path.exists(new_data_path):
-                os.makedirs(new_data_path)
+        wudao_data = load_data(
+            self.config, rank=self.global_rank, is_wudao=True)
+        print(f'There are {wudao_data.num_rows} Wudao Data!')
+        new_data_path = self.config.gen_data_path + \
+            f'_cycle_{self.config.cycle + 1}'
+        if not os.path.exists(new_data_path):
+            os.makedirs(new_data_path)
 
-            def _generate_sim_sentence(example):
-                torch.cuda.empty_cache()
-                input_ids, length_list = [], []
-                for item in example['sentence_list']:
-                    if len(input_ids) >= (
-                            self.config.sentence_num * self.config.gen_repeat_times):
-                        break
-                    if item is None or item == []:
-                        continue
+        def _generate_sim_sentence(example):
+            torch.cuda.empty_cache()
+            input_ids, length_list = [], []
+            for item in example['sentence_list']:
+                if item is None or item == []:
+                    continue
 
-                    # 每段话只随机选一条句子
-                    random_num = random.sample(range(len(item)), 1)[0]
-                    cur_input_ids = self.gen_tokenizer(
-                        '<bos>“' + item[random_num] + '”的相似句是“', return_tensors='pt'
-                    ).input_ids.squeeze()[:-1]  # 不能加<eos>
+                # 每段话只随机选一条句子
+                random_num = random.sample(range(len(item)), 1)[0]
+                cur_input_ids = self.gen_tokenizer(
+                    '<bos>“' + item[random_num] + '”的相似句是“', return_tensors='pt'
+                ).input_ids.squeeze()[:-1]  # 不能加<eos>
 
-                    # 每个样本复制几份
-                    length = [cur_input_ids.size(
-                        0)] * self.config.gen_repeat_times
-                    cur_input_ids = [cur_input_ids] * \
-                        self.config.gen_repeat_times
+                # 每个样本复制几份
+                length = [cur_input_ids.size(
+                    0)] * self.config.gen_repeat_times
+                cur_input_ids = [cur_input_ids] * \
+                    self.config.gen_repeat_times
 
-                    length_list.extend(length)
-                    input_ids.extend(cur_input_ids)
+                length_list.extend(length)
+                input_ids.extend(cur_input_ids)
 
-                input_ids = pad_sequence(
-                    [x for x in input_ids], batch_first=True, padding_value=50000)
-                length_tensor = torch.tensor(length_list)
+            input_ids = pad_sequence(
+                [x for x in input_ids], batch_first=True, padding_value=50000)
+            length_tensor = torch.tensor(length_list)
 
-                output_ids_list = sample_sequence_batch(
-                    model=self.generator.gen.cuda(), context_tokens_tensor=input_ids.cuda(),
-                    context_length_tensor=length_tensor, repetition_penalty=1.5, max_out_seq=200,
-                    end_token_id=50000, temperature=1.5, top_k=0, top_p=0.82,
-                )
-                sim_sentence = self.gen_tokenizer.batch_decode(
-                    output_ids_list, skip_special_tokens=True)
+            output_ids_list = sample_sequence_batch(
+                model=self.generator.gen.cuda(), context_tokens_tensor=input_ids.cuda(),
+                context_length_tensor=length_tensor, repetition_penalty=1.5, max_out_seq=200,
+                end_token_id=50000, temperature=1.5, top_k=0, top_p=0.82,
+            )
+            sim_sentence = self.gen_tokenizer.batch_decode(
+                output_ids_list, skip_special_tokens=True)
 
-                raw_text, sim_text = [], []
-                for item in sim_sentence:
-                    if item.count('”的相似句是“') != 1 or item.count('“') % 2 != 0 or item.count('”') % 2 != 0:
-                        continue
+            raw_text, sim_text = [], []
+            for item in sim_sentence:
+                if item.count('”的相似句是“') != 1 or item.count('“') % 2 != 0 or item.count('”') % 2 != 0:
+                    continue
 
-                    item = item.replace(' ', '').split('”的相似句是“')
-                    raw_text.append(item[0][1:])
-                    sim_text.append(item[1][:-1])
+                item = item.replace(' ', '').split('”的相似句是“')
+                raw_text.append(item[0][1:])
+                sim_text.append(item[1][:-1])
 
-                if self.config.cycle < self.config.gen_anti_cyle:
-                    scores = [0] * len(raw_text)
-                else:
-                    scores = [1] * len(raw_text)
+            if self.config.cycle < self.config.gen_anti_cyle:
+                scores = [0] * len(raw_text)
+            else:
+                scores = [1] * len(raw_text)
 
-                return {'text1': raw_text, 'text2': sim_text, 'score': scores}
+            return {'text1': raw_text, 'text2': sim_text, 'score': scores}
 
-            feats = datasets.Features({"text1": datasets.Value('string'),
-                                       "text2": datasets.Value('string'),
-                                       "score": datasets.Value('int8')})
-            gen_sim_ds = wudao_data.map(
-                _generate_sim_sentence,
-                batched=True,
-                batch_size=128,
-                num_proc=1,
-                features=feats,
-                cache_file_name=new_data_path + '/cache',
-                remove_columns=['sentence_list'])
+        feats = datasets.Features({"text1": datasets.Value('string'),
+                                    "text2": datasets.Value('string'),
+                                    "score": datasets.Value('int8')})
+        gen_sim_ds = wudao_data.map(
+            _generate_sim_sentence,
+            batched=True,
+            batch_size=128,
+            num_proc=1,
+            features=feats,
+            cache_file_name=new_data_path + '/cache',
+            remove_columns=['sentence_list'])
+        
+        if self.global_rank == 0:
             print(f'Generate Data Samples is {gen_sim_ds.num_rows}')
 
             gen_sim_ds.save_to_disk(new_data_path)

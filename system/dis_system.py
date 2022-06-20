@@ -110,47 +110,49 @@ class DisSystem(LightningModule):
     def judge_similarity(self):
         if self.global_rank == 0:
             print('Staring Scoring...')
-            generated_data = load_data(self.config, rank=self.global_rank, is_labeled=False,
-                                       is_score=True, attri='dis')
-            new_data_path = self.config.score_data_path + \
-                f'_cycle_{self.config.cycle + 1}'
-            if not os.path.exists(new_data_path):
-                os.makedirs(new_data_path)
+        generated_data = load_data(self.config, rank=self.global_rank, is_labeled=False,
+                                   is_score=True, attri='dis')
+        new_data_path = self.config.score_data_path + \
+            f'_cycle_{self.config.cycle + 1}'
+        if not os.path.exists(new_data_path):
+            os.makedirs(new_data_path)
 
-            def _generate_sim_sentence(example):
-                torch.cuda.empty_cache()
-                input_texts = []
-                for idx in range(len(example['text1'])):
-                    input_texts.append(
-                        example['text1'][idx] + '[SEP]' + example['text2'][idx])
+        def _generate_sim_sentence(example):
+            torch.cuda.empty_cache()
+            input_texts = []
+            for idx in range(len(example['text1'])):
+                input_texts.append(
+                    example['text1'][idx] + '[SEP]' + example['text2'][idx])
 
-                input_ids = self.dis_tokenizer(
-                    input_texts, padding=True, return_tensors='pt').input_ids
-                with torch.no_grad():
-                    self.discriminator.to('cuda').eval()
-                    logits = self.discriminator.forward(
-                        dis_input_ids=input_ids.cuda(), labels=None)
-                    logits = torch.softmax(logits, dim=1)
+            input_ids = self.dis_tokenizer(
+                input_texts, padding=True, return_tensors='pt').input_ids
+            with torch.no_grad():
+                self.discriminator.to('cuda').eval()
+                logits = self.discriminator.forward(
+                    dis_input_ids=input_ids.cuda(), labels=None)
+                logits = torch.softmax(logits, dim=1)
 
-                assert len(example['text1']) == logits.size(0)
-                for idx, item in enumerate(logits):
-                    if item[1] >= self.config.dis_threshold:
-                        example['score'][idx] = 1
-                    elif item[0] >= self.config.dis_threshold:
-                        example['score'][idx] = 0
-                    else:
-                        example['score'][idx] = -5
+            assert len(example['text1']) == logits.size(0)
+            for idx, item in enumerate(logits):
+                if item[1] >= self.config.dis_threshold:
+                    example['score'][idx] = 1
+                elif item[0] >= self.config.dis_threshold:
+                    example['score'][idx] = 0
+                else:
+                    example['score'][idx] = -5
 
-                return example
+            return example
 
-            score_sim_ds = generated_data.map(
-                _generate_sim_sentence,
-                batched=True,
-                batch_size=1536,
-                num_proc=1,
-                cache_file_name=new_data_path + '/raw_cache')
-            score_sim_ds = score_sim_ds.filter(lambda example: example['score'] != -5,
-                                               cache_file_name=new_data_path + '/cache')
+        score_sim_ds = generated_data.map(
+            _generate_sim_sentence,
+            batched=True,
+            batch_size=1536,
+            num_proc=1,
+            cache_file_name=new_data_path + '/raw_cache')
+        score_sim_ds = score_sim_ds.filter(lambda example: example['score'] != -5,
+                                            cache_file_name=new_data_path+'/cache')
+        
+        if self.global_rank == 0:
             print(f'Score Data Samples is {score_sim_ds.num_rows}')
 
             score_sim_ds.save_to_disk(new_data_path)
