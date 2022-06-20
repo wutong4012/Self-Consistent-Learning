@@ -1,7 +1,8 @@
 import glob
 import random
-import torch
+
 import datasets
+import torch
 from torch.utils.data import DataLoader, Dataset
 
 from data_utlis.sim_data_collate import (discriminator_collate_fn,
@@ -25,7 +26,7 @@ class SimGanDataset(Dataset):
         return self.data.num_rows
 
 
-def load_data(config, rank, is_labeled=False, is_wudao=False, 
+def load_data(config, rank, is_labeled=False, is_wudao=False,
               is_score=False, attri=None):
     if is_wudao:
         cache_dict_paths = glob.glob(config.wudao_data_path + '/*')
@@ -35,7 +36,7 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
             wudao_ds = wudao_ds.select(
                 range(config.sentence_num * config.gen_repeat_times * 2))
         return wudao_ds
-        
+
     if is_labeled:  # 1590792 -> 1488200 -> 1391008
         cache_dict_paths = glob.glob(config.lab_data_path + '/*')
 
@@ -54,11 +55,12 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
             data_path = config.score_data_path + '_cycle_{}'.format(config.cycle)
         print(f'Data Path: {data_path} !')
         sim_dataset = datasets.load_from_disk(data_path)
-        
+
         def LCS(str1, str2):
             len_str1 = len(str1)
             len_str2 = len(str2)
-            record = [[0 for i in range(len_str2 + 1)] for j in range(len_str1 + 1)]
+            record = [[0 for i in range(len_str2 + 1)]
+                      for j in range(len_str1 + 1)]
             for i in range(len_str1):
                 for j in range(len_str2):
                     if str1[i] == str2[j]:
@@ -68,11 +70,13 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
                     else:
                         record[i + 1][j + 1] = record[i][j + 1]
             return record[-1][-1]
+
         def process_equal(example):
             if min(len(example['text1']), len(example['text2'])) <= 10:  # 最小长度设为10
                 example['score'] = -1
             else:
-                delta = min(len(example['text1']), len(example['text2'])) - LCS(example['text1'], example['text2'])
+                delta = min(len(example['text1']), len(
+                    example['text2'])) - LCS(example['text1'], example['text2'])
                 if delta <= 1:
                     example['score'] = -2
                 elif delta <= 2 and attri == 'gen':
@@ -81,28 +85,28 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
         sim_dataset = sim_dataset.map(
             process_equal,
             cache_file_name=data_path+'/map_cache')
-        
+
         if attri == 'dis':
             if rank == 0:
                 cnt = sim_dataset.filter(lambda example: example['score'] == -1,
-                                        cache_file_name=data_path+'/short_cache').num_rows
+                                         cache_file_name=data_path+'/short_cache').num_rows
                 print(f'There are {cnt} Short(<=10) Sentence!')
                 cnt = sim_dataset.filter(lambda example: example['score'] == -2,
-                                        cache_file_name=data_path+'/bad_cache').num_rows
+                                         cache_file_name=data_path+'/bad_cache').num_rows
                 print(f'There are {cnt} Bad Sentence!')
                 torch.distributed.barrier()
             else:
                 torch.distributed.barrier()
-                
+
             sim_dataset = sim_dataset.filter(lambda example: example['score'] != -1,
                                              cache_file_name=data_path+'/del_short_cache')
             sim_dataset = sim_dataset.filter(lambda example: example['score'] != -2,
                                              cache_file_name=data_path+'/del_bad_cache')
-            
+
         elif attri == 'gen':
             if rank == 0:
                 cnt = sim_dataset.filter(lambda example: example['score'] == -3,
-                                        cache_file_name=data_path+'/equal_cache').num_rows
+                                         cache_file_name=data_path+'/equal_cache').num_rows
                 print(f'There are {cnt} Equal Sentence!')
                 torch.distributed.barrier()
             else:
@@ -123,7 +127,7 @@ def set_dataset(config, use_label, use_gen, rank, attri=None):
         start, end = (config.cycle * generated_data.num_rows * 2), (
             (config.cycle + 1) * generated_data.num_rows * 2)
         part_labeled_data = labeled_data.select(range(start, end))
-        
+
         if rank == 0:
             random_list = random.sample(range(part_labeled_data.num_rows), 10)
             for i in random_list:
@@ -134,7 +138,7 @@ def set_dataset(config, use_label, use_gen, rank, attri=None):
             torch.distributed.barrier()
         else:
             torch.distributed.barrier()
-        
+
         if attri == 'dis':
             assert part_labeled_data.features.type == generated_data.features.type
             if config.cycle < config.gen_anti_cyle:
@@ -146,7 +150,7 @@ def set_dataset(config, use_label, use_gen, rank, attri=None):
                 positived_data = positived_data.select(range(generated_data.num_rows))
                 data = datasets.concatenate_datasets(
                     [part_labeled_data, generated_data, positived_data])
-                
+
             else:
                 def filter_fn(example, idx):
                     return ((idx <= start) or (idx >= end)) and (example['score'] == 0)
@@ -156,8 +160,8 @@ def set_dataset(config, use_label, use_gen, rank, attri=None):
                 negtived_data = negtived_data.select(range(generated_data.num_rows))
                 data = datasets.concatenate_datasets(
                     [part_labeled_data, generated_data, negtived_data])
-            
-            if rank == 0:  
+
+            if rank == 0:
                 print('From Generated Data Positive Samples: ', generated_data.filter(
                     lambda example: example['score'] == 1,
                     cache_file_name=config.cache_data_path+'/gen_pos_cache_'+str(config.cycle)).num_rows)
@@ -173,7 +177,7 @@ def set_dataset(config, use_label, use_gen, rank, attri=None):
                 torch.distributed.barrier()
             else:
                 torch.distributed.barrier()
-            
+
         elif attri == 'gen':
             part_labeled_data = part_labeled_data.filter(
                 lambda example: example['score'] == 1,

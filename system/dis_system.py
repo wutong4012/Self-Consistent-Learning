@@ -1,4 +1,5 @@
 import os
+
 import evaluate
 import torch
 from pytorch_lightning import LightningModule
@@ -7,8 +8,8 @@ from transformers.optimization import AdamW, get_cosine_schedule_with_warmup
 
 from data_utlis.sim_gan_dataset import (create_dataloader, load_data,
                                         set_dataset)
-from system.utils import torch_distributed_zero_first
 from model_utils.sim_gan_model import Discriminator
+from system.utils import torch_distributed_zero_first
 
 
 class DisSystem(LightningModule):
@@ -17,44 +18,46 @@ class DisSystem(LightningModule):
         super().__init__()
         self.config = config
         print('\nInitialize Discriminator...')
-        
+
         self.f1_metric = evaluate.load("f1")
         self._set_tokenizers_and_models()
 
     def set_dis_dataset(self):
         self.train_dataset, self.val_dataset = \
-            set_dataset(self.config, use_label=True, use_gen=True, 
+            set_dataset(self.config, use_label=True, use_gen=True,
                         rank=self.global_rank, attri='dis')
 
     def _set_tokenizers_and_models(self):
-        self.dis_tokenizer = BertTokenizer.from_pretrained(self.config.discriminator)
+        self.dis_tokenizer = BertTokenizer.from_pretrained(
+            self.config.discriminator)
         self.discriminator = Discriminator(self.config)
-        
+
         if self.config.cycle == 0:
-            state_dict = torch.load(self.config.dis_model_path, 
+            state_dict = torch.load(self.config.dis_model_path,
                                     map_location='cpu')['module']
             new_dict = {key[len('module.discriminator.'):]: val for key,
                         val in state_dict.items()}
             self.discriminator.load_state_dict(new_dict)
         else:
-            state_dict = torch.load(self.config.ckpt_model_path +\
-                f'/discriminator_cycle_{self.config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt', 
-                map_location='cpu')['module']
+            state_dict = torch.load(self.config.ckpt_model_path +
+                                    f'/discriminator_cycle_{self.config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt',
+                                    map_location='cpu')['module']
             new_dict = {key[len('module.discriminator.'):]: val for key,
                         val in state_dict.items()}
             self.discriminator.load_state_dict(new_dict)
-        print(f'Cycle {self.config.cycle}: The Discriminator Erlangshen Load Successfully !\n')
+        print(
+            f'Cycle {self.config.cycle}: The Discriminator Erlangshen Load Successfully !\n')
 
     def train_dataloader(self):
         with torch_distributed_zero_first(self.global_rank):
             self.set_dis_dataset()
             return create_dataloader(config=self.config, dataset=self.train_dataset,
-                                    tokenizer=self.dis_tokenizer, attri='dis', shuffle=True)
+                                     tokenizer=self.dis_tokenizer, attri='dis', shuffle=True)
 
     def val_dataloader(self):
         with torch_distributed_zero_first(self.global_rank):
             return create_dataloader(config=self.config, dataset=self.val_dataset,
-                                    tokenizer=self.dis_tokenizer, attri='dis', shuffle=False)
+                                     tokenizer=self.dis_tokenizer, attri='dis', shuffle=False)
 
     def configure_optimizers(self):
         optimizer = AdamW(
@@ -84,7 +87,7 @@ class DisSystem(LightningModule):
             batch['labels'].cuda(),
         )
         self.log('dis_train_loss', loss, on_step=True, on_epoch=True)
-        
+
         return loss
 
     def validation_step(self, batch, batch_ids):
@@ -94,28 +97,29 @@ class DisSystem(LightningModule):
             batch['labels'].cuda()
         )
         self.log('dis_val_loss', loss.item())
-        
+
         predictions = torch.argmax(logits, dim=1)
         f1_score = self.f1_metric.compute(
             references=batch['labels'].squeeze().cuda(),
             predictions=predictions
         )
         self.log('dis_f1_score', f1_score['f1'])
-        
+
         return loss
-    
+
     def judge_similarity(self):
         if self.global_rank == 0:
             print('Staring Scoring...')
-            generated_data = load_data(self.config, rank=self.global_rank, is_labeled=False, 
+            generated_data = load_data(self.config, rank=self.global_rank, is_labeled=False,
                                        is_score=True, attri='dis')
-            new_data_path = self.config.score_data_path + f'_cycle_{self.config.cycle + 1}'
+            new_data_path = self.config.score_data_path + \
+                f'_cycle_{self.config.cycle + 1}'
             if not os.path.exists(new_data_path):
                 os.makedirs(new_data_path)
-            
+
             def _generate_sim_sentence(example):
                 torch.cuda.empty_cache()
-                scores, input_texts = [], []
+                input_texts = []
                 for idx in range(len(example['text1'])):
                     input_texts.append(
                         example['text1'][idx] + '[SEP]' + example['text2'][idx])
@@ -146,9 +150,9 @@ class DisSystem(LightningModule):
                 num_proc=1,
                 cache_file_name=new_data_path + '/raw_cache')
             score_sim_ds = score_sim_ds.filter(lambda example: example['score'] != -5,
-                                            cache_file_name=new_data_path + '/cache')
+                                               cache_file_name=new_data_path + '/cache')
             print(f'Score Data Samples is {score_sim_ds.num_rows}')
-            
+
             score_sim_ds.save_to_disk(new_data_path)
             print('score_data: done!!!')
             torch.distributed.barrier()
