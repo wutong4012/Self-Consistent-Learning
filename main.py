@@ -9,14 +9,14 @@ from system.gen_system import GenSystem
 from system.dis_system import DisSystem            
             
 
-def set_trainer(config, steps, ckpt_callback, early_stopping, batch_size):
+def set_trainer(config, steps, ckpt_callback, early_stopping):
     lr_callback = LearningRateMonitor(logging_interval='step')
     trainer = Trainer(
         default_root_dir=config.exp_dir,
         gpus=8,
         strategy=DeepSpeedStrategy(
-            offload_optimizer=False,
-            logging_batch_size_per_gpu=batch_size),
+            offload_optimizer=True,
+            logging_batch_size_per_gpu=2),
         precision=16,
         log_every_n_steps=1,
         num_sanity_val_steps=0,
@@ -47,7 +47,6 @@ def generator_cycle(config, gen_system):
         steps=int(config.gen_train_steps), 
         ckpt_callback=gen_ckpt_callback, 
         early_stopping=gen_early_stopping,
-        batch_size=config.gen_batch_size
     )
 
     gen_trainer.fit(gen_system)
@@ -73,7 +72,6 @@ def discriminator_cycle(config, dis_system):
         steps=int(config.dis_train_steps),
         ckpt_callback=dis_ckpt_callback,
         early_stopping=dis_early_stopping,
-        batch_size=config.dis_batch_size
     )
     
     dis_trainer.fit(dis_system)
