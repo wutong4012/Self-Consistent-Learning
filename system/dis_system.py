@@ -6,9 +6,9 @@ from pytorch_lightning import LightningModule
 from transformers import BertTokenizer
 from transformers.optimization import AdamW, get_cosine_schedule_with_warmup
 
-from data_utlis.sim_gan_dataset import (create_dataloader, load_data,
+from data_utlis.sim_gen_dataset import (create_dataloader, load_data,
                                         set_dataset)
-from model_utils.sim_gan_model import Discriminator
+from model_utils.sim_gen_model import Discriminator
 from system.utils import torch_distributed_zero_first
 
 

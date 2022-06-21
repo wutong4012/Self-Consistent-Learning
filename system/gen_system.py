@@ -9,8 +9,8 @@ from transformers import T5Tokenizer
 from transformers.optimization import AdamW, get_cosine_schedule_with_warmup
 
 from data_utlis.sample_sequence import sample_sequence_batch
-from data_utlis.sim_gan_dataset import create_dataloader, load_data, set_dataset
-from model_utils.sim_gan_model import Generator
+from data_utlis.sim_gen_dataset import create_dataloader, load_data, set_dataset
+from model_utils.sim_gen_model import Generator
 from system.utils import torch_distributed_zero_first
 
 

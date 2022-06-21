@@ -8,7 +8,7 @@ from transformers import BertTokenizer
 
 import sys
 sys.path.append('/cognitive_comp/wutong/similarity_generation/')
-from model_utils.sim_gan_model import Discriminator
+from model_utils.sim_gen_model import Discriminator
 
 _BATCH_SIZE = 1280  # bert-2048 / els-1280
 _DISCRIMINATOR = 'erlangshen'

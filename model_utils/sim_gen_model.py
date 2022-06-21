@@ -82,6 +82,8 @@ class Generator(nn.Module):
                 new_dict[k[len('module.generator.gen.'):]] = v
             else:
                 continue
+        if new_dict == {}:
+            new_dict = state_dict
         self.gen.load_state_dict(new_dict)
         print(f'Cycle {config.cycle}: The Generator Transformer-XL Load Successfully !\n')
 
