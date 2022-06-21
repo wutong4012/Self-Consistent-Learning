@@ -9,7 +9,7 @@ from system.gen_system import GenSystem
 from system.dis_system import DisSystem            
             
 
-def set_trainer(config, steps, ckpt_callback, early_stopping):
+def set_trainer(config, ckpt_callback, early_stopping):
     lr_callback = LearningRateMonitor(logging_interval='step')
     trainer = Trainer(
         default_root_dir=config.exp_dir,
@@ -22,7 +22,7 @@ def set_trainer(config, steps, ckpt_callback, early_stopping):
         num_sanity_val_steps=0,
         check_val_every_n_epoch=1,
         callbacks=[lr_callback, ckpt_callback, early_stopping],
-        max_steps=steps,
+        max_epochs=config.epochs,
     )
 
     return trainer
@@ -39,12 +39,11 @@ def generator_cycle(config, gen_system):
     )
     gen_early_stopping = EarlyStopping(
         monitor='gen_val_loss',
-        patience=3,
+        patience=2,
         mode='min'
     )
     gen_trainer = set_trainer(
-        config=config,
-        steps=int(config.gen_train_steps), 
+        config=config, 
         ckpt_callback=gen_ckpt_callback, 
         early_stopping=gen_early_stopping,
     )
@@ -64,12 +63,11 @@ def discriminator_cycle(config, dis_system):
     )
     dis_early_stopping = EarlyStopping(
         monitor='dis_f1_score',
-        patience=3,
+        patience=2,
         mode='max'
     )
     dis_trainer = set_trainer(
         config=config,
-        steps=int(config.dis_train_steps),
         ckpt_callback=dis_ckpt_callback,
         early_stopping=dis_early_stopping,
     )
@@ -87,7 +85,7 @@ def run(config):
     gen_system = GenSystem(config)
     dis_system = DisSystem(config)
     
-    for idx in range(1, config.cycle_nums):
+    for idx in range(0, config.cycle_nums):
         config.cycle = idx
         print('Cycle: {}'.format(config.cycle))
 

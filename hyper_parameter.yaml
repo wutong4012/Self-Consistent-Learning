@@ -29,9 +29,10 @@ learning_rate: 2e-5
 dis_hidden_size: 1024
 discriminator: 'IDEA-CCNL/Erlangshen-Roberta-330M-Similarity'
 
-gen_train_steps: 500
-dis_train_steps: 1000
+epochs: 50
+gen_train_steps: 2000
+dis_train_steps: 2000
 warmup_steps: 50
 checkpoint_steps: 10
 cycle_nums: 50
-cycle: 1
+cycle: 0
