@@ -16,19 +16,19 @@ class Discriminator(nn.Module):
             config.discriminator, num_labels=2)
 
         if config.cycle == 0:
-            state_dict = torch.load(config.dis_model_path,
-                                    map_location='cpu')['module']
-            new_dict = {key[len('module.discriminator.dis.'):]: val for key,
-                        val in state_dict.items()}
-            self.dis.load_state_dict(new_dict)
+            pt_path = config.dis_model_path
         else:
-            state_dict = torch.load(
-                config.ckpt_model_path +
+            pt_path = config.ckpt_model_path + \
                 f'/discriminator_cycle_{config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt',
-                map_location='cpu')['module']
-            new_dict = {key[len('module.discriminator.dis.'):]: val for key,
-                        val in state_dict.items()}
-            self.dis.load_state_dict(new_dict)
+        
+        new_dict = {}
+        state_dict = torch.load(pt_path, map_location='cpu')['module']
+        for k, v in state_dict.items():
+            if any([i in k for i in ['module.discriminator.dis.']]):
+                new_dict[k[len('module.discriminator.dis.'):]] = v
+            else:
+                continue
+        self.dis.load_state_dict(new_dict)
         print(f'Cycle {config.cycle}: The Discriminator Erlangshen Load Successfully !\n')
 
     def forward(self, dis_input_ids, labels):
@@ -70,15 +70,19 @@ class Generator(nn.Module):
         )
         
         if config.cycle == 0:
-            self.gen.load_state_dict(torch.load(config.txl_model_path, 
-                                                map_location='cpu')['module'])
+            pt_path = config.txl_model_path
         else:
-            state_dict = torch.load(config.ckpt_model_path +\
-                f'/generator_cycle_{config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt', 
-                map_location='cpu')['module']
-            new_dict = {key[len('module.generator.gen.'):]: val for key,
-                        val in state_dict.items()}
-            self.gen.load_state_dict(new_dict)
+            pt_path = config.ckpt_model_path +\
+                f'/generator_cycle_{config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt'
+        
+        new_dict = {}
+        state_dict = torch.load(pt_path, map_location='cpu')['module']
+        for k, v in state_dict.items():
+            if any([i in k for i in ['module.generator.gen.']]):
+                new_dict[k[len('module.generator.gen.'):]] = v
+            else:
+                continue
+        self.gen.load_state_dict(new_dict)
         print(f'Cycle {config.cycle}: The Generator Transformer-XL Load Successfully !\n')
 
     def forward(self, gen_input_ids, lengths_input_ids, memory_attention_mask):
