@@ -19,8 +19,8 @@ class Discriminator(nn.Module):
             pt_path = config.dis_model_path
         else:
             pt_path = config.ckpt_model_path + \
-                f'/discriminator_cycle_{config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt',
-        
+                f'/discriminator_cycle_{config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt'
+
         new_dict = {}
         state_dict = torch.load(pt_path, map_location='cpu')['module']
         for k, v in state_dict.items():
