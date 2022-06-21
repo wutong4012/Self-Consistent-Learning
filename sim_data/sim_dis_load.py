@@ -29,6 +29,9 @@ def load_gen_data():
 
 
 class Config:
+    cycle = 0
+    dis_model_path = '/cognitive_comp/wutong/source/model_base/discriminator.pt'
+    
     if _DISCRIMINATOR == 'bert':
         dis_hidden_size = 768
         discriminator = 'bert-base-chinese'
@@ -42,20 +45,20 @@ def load_dis_model():
     config = Config()
     dis_model = Discriminator(config)
 
-    if _DISCRIMINATOR == 'bert':
-        state_dict = torch.load(
-            '/cognitive_comp/wutong/source/model_base/discriminator_bert.ckpt')['state_dict']
-        new_dict = {key[len('discriminator.'):]: val for key,
-                    val in state_dict.items()}
+    # if _DISCRIMINATOR == 'bert':
+    #     state_dict = torch.load(
+    #         '/cognitive_comp/wutong/source/model_base/discriminator_bert.ckpt')['state_dict']
+    #     new_dict = {key[len('discriminator.'):]: val for key,
+    #                 val in state_dict.items()}
 
-    elif _DISCRIMINATOR == 'erlangshen':
-        state_dict = torch.load(
-            '/cognitive_comp/wutong/source/model_base/discriminator.pt', 
-            map_location='cpu')['module']
-        new_dict = {key[len('module.discriminator.'):]: val for key,
-                    val in state_dict.items()}
+    # elif _DISCRIMINATOR == 'erlangshen':
+    #     state_dict = torch.load(
+    #         '/cognitive_comp/wutong/source/model_base/discriminator.pt', 
+    #         map_location='cpu')['module']
+    #     new_dict = {key[len('module.discriminator.'):]: val for key,
+    #                 val in state_dict.items()}
 
-    dis_model.load_state_dict(new_dict)
+    # dis_model.load_state_dict(new_dict)
 
     return dis_model
 
@@ -89,8 +92,10 @@ def generate_arrow_cache(num_proc=1) -> None:
         for item in logits:
             if item[1] >= 0.7:
                 scores.append(1)
-            else:
+            elif item[0] >= 0.7:
                 scores.append(0)
+            else:
+                scores.append(-5)
     
         return {'score': scores}
 

@@ -33,9 +33,6 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
         cache_dict_paths = glob.glob(config.wudao_data_path + '/*')
         data_path = cache_dict_paths[config.cycle]
         wudao_ds = datasets.load_from_disk(data_path)
-        if wudao_ds.num_rows > config.sentence_num * 2:
-            wudao_ds = wudao_ds.select(
-                range(config.sentence_num * 2))
         return wudao_ds
 
     if is_labeled:  # 1590792 -> 1488200 -> 1391008

@@ -104,7 +104,7 @@ class GenSystem(LightningModule):
             torch.cuda.empty_cache()
             input_ids, length_list = [], []
             for item in example['sentence_list']:
-                if item is None or item == []:
+                if item is None or item == [] or len(item) <= 10:
                     continue
 
                 # 每段话只随机选一条句子
@@ -114,10 +114,8 @@ class GenSystem(LightningModule):
                 ).input_ids.squeeze()[:-1]  # 不能加<eos>
 
                 # 每个样本复制几份
-                length = [cur_input_ids.size(
-                    0)] * self.config.gen_repeat_times
-                cur_input_ids = [cur_input_ids] * \
-                    self.config.gen_repeat_times
+                length = [cur_input_ids.size(0)] * self.config.gen_repeat_times
+                cur_input_ids = [cur_input_ids] * self.config.gen_repeat_times
 
                 length_list.extend(length)
                 input_ids.extend(cur_input_ids)
@@ -140,7 +138,8 @@ class GenSystem(LightningModule):
 
             raw_text, sim_text = [], []
             for item in sim_sentence:
-                if item.count('”的相似句是“') != 1 or item.count('“') % 2 != 0 or item.count('”') % 2 != 0:
+                if item.count('”的相似句是“') != 1 or (
+                    item.count('“') % 2 != 0 or item.count('”') % 2 != 0):
                     continue
 
                 item = item.replace(' ', '').split('”的相似句是“')

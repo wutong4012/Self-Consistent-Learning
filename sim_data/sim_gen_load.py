@@ -78,7 +78,6 @@ def generate_arrow_cache(num_proc=1) -> None:
 
     def _generate_sim_sentence(example):
         torch.cuda.empty_cache()
-        sim_text = []
         input_ids, length_list = [], []
         for item in example['sentence_list']:
             if item is None or item == [] or len(item) <= 10:
@@ -101,7 +100,7 @@ def generate_arrow_cache(num_proc=1) -> None:
 
         output_ids_list = sample_sequence_batch(
             model=generator.cuda(), context_tokens_tensor=input_ids.cuda(), context_length_tensor=length_tensor,
-            repetition_penalty=1.5, max_out_seq=200, end_token_id=50000, temperature=1.5, top_k=0, top_p=0.82,
+            repetition_penalty=1.5, max_out_seq=200, end_token_id=50000, temperature=1.0, top_k=0, top_p=0.95,
         )
         sim_sentence = gen_tokenizer.batch_decode(output_ids_list, skip_special_tokens=True)
 
@@ -115,7 +114,7 @@ def generate_arrow_cache(num_proc=1) -> None:
             item = item.replace(' ', '').split('”的相似句是“')
             raw_text.append(item[0][1:])
             sim_text.append(item[1][:-1])
-        score = [1] * len(raw_text)
+        score = [0] * len(raw_text)
 
         return {'text1': raw_text, 'text2': sim_text, 'score': score}
 

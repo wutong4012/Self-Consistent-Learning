@@ -53,7 +53,7 @@ def generator_cycle(config, gen_system):
 
 
 def discriminator_cycle(config, dis_system):
-    
+    torch.cuda.empty_cache()
     dis_ckpt_callback = ModelCheckpoint(
         save_top_k=1,
         monitor='dis_f1_score',
