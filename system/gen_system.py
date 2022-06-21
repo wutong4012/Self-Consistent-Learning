@@ -93,12 +93,12 @@ class GenSystem(LightningModule):
     def generate_samples(self):
         if self.global_rank == 0:
             print('Staring Generating...')
+            new_data_path = self.config.gen_data_path + \
+                f'_cycle_{self.config.cycle + 1}'
+            if not os.path.exists(new_data_path):
+                os.makedirs(new_data_path)
         wudao_data = load_data(
             self.config, rank=self.global_rank, is_wudao=True)
-        new_data_path = self.config.gen_data_path + \
-            f'_cycle_{self.config.cycle + 1}'
-        if not os.path.exists(new_data_path):
-            os.makedirs(new_data_path)
 
         def _generate_sim_sentence(example):
             torch.cuda.empty_cache()

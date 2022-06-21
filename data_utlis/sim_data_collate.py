@@ -121,8 +121,8 @@ def discriminator_collate_fn(batch_data, tokenizer, is_train):
             dis_text = item['text1'] + '[SEP]' + item['text2']
             input_ids = tokenizer(dis_text, return_tensors='pt').input_ids.squeeze()
         
-        if input_ids.size(0) > 400:
-            input_ids = torch.cat([input_ids[:400], torch.tensor([102])])
+        if input_ids.size(0) >= 512:
+            input_ids = torch.cat([input_ids[:511], torch.tensor([102])])
 
         dis_text_input_ids.append(input_ids)
         labels.append(torch.tensor(item['score'], dtype=torch.long))

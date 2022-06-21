@@ -94,12 +94,12 @@ class DisSystem(LightningModule):
     def judge_similarity(self):
         if self.global_rank == 0:
             print('Staring Scoring...')
+            new_data_path = self.config.score_data_path + \
+                f'_cycle_{self.config.cycle + 1}'
+            if not os.path.exists(new_data_path):
+                os.makedirs(new_data_path)
         generated_data = load_data(self.config, rank=self.global_rank, is_labeled=False,
                                    is_score=True, attri='dis')
-        new_data_path = self.config.score_data_path + \
-            f'_cycle_{self.config.cycle + 1}'
-        if not os.path.exists(new_data_path):
-            os.makedirs(new_data_path)
 
         def _generate_sim_sentence(example):
             torch.cuda.empty_cache()

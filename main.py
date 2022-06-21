@@ -16,7 +16,7 @@ def set_trainer(config, ckpt_callback, early_stopping):
         gpus=8,
         strategy=DeepSpeedStrategy(
             offload_optimizer=True,
-            logging_batch_size_per_gpu=2),
+            logging_batch_size_per_gpu=1),
         precision=16,
         log_every_n_steps=1,
         num_sanity_val_steps=0,
@@ -78,14 +78,14 @@ def discriminator_cycle(config, dis_system):
 
 @hydra.main(config_path='./', config_name='hyper_parameter')
 def run(config):
-    torch.backends.cudnn.enabled = True
-    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic=True
     seed_everything(config.seed)
     
     gen_system = GenSystem(config)
     dis_system = DisSystem(config)
     
-    for idx in range(1, config.cycle_nums):
+    for idx in range(3, config.cycle_nums):
         config.cycle = idx
         print('Cycle: {}'.format(config.cycle))
 
