@@ -12,10 +12,24 @@ class Discriminator(nn.Module):
     def __init__(self, config) -> None:
         super().__init__()
 
-        self.sigmoid = nn.Sigmoid()
-        self.linear = nn.Linear(config.dis_hidden_size, 2, bias=False)
         self.dis = BertForSequenceClassification.from_pretrained(
             config.discriminator, num_labels=2)
+
+        if config.cycle == 0:
+            state_dict = torch.load(config.dis_model_path,
+                                    map_location='cpu')['module']
+            new_dict = {key[len('module.discriminator.dis.'):]: val for key,
+                        val in state_dict.items()}
+            self.dis.load_state_dict(new_dict)
+        else:
+            state_dict = torch.load(
+                config.ckpt_model_path +
+                f'/discriminator_cycle_{config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt',
+                map_location='cpu')['module']
+            new_dict = {key[len('module.discriminator.dis.'):]: val for key,
+                        val in state_dict.items()}
+            self.dis.load_state_dict(new_dict)
+        print(f'Cycle {config.cycle}: The Discriminator Erlangshen Load Successfully !\n')
 
     def forward(self, dis_input_ids, labels):
         attention_mask = (dis_input_ids > 0).int()
@@ -28,10 +42,6 @@ class Discriminator(nn.Module):
         
         if labels == None:
             return dis_output.logits
-
-        # logits = self.sigmoid(self.linear(dis_output.pooler_output))
-        # loss_fct = nn.MSELoss()
-        # loss = loss_fct(logits.view(-1), labels.view(-1))
 
         return dis_output.loss, dis_output.logits
 

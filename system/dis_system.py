@@ -32,22 +32,6 @@ class DisSystem(LightningModule):
             self.config.discriminator)
         self.discriminator = Discriminator(self.config)
 
-        if self.config.cycle == 0:
-            state_dict = torch.load(self.config.dis_model_path,
-                                    map_location='cpu')['module']
-            new_dict = {key[len('module.discriminator.'):]: val for key,
-                        val in state_dict.items()}
-            self.discriminator.load_state_dict(new_dict)
-        else:
-            state_dict = torch.load(self.config.ckpt_model_path +
-                                    f'/discriminator_cycle_{self.config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt',
-                                    map_location='cpu')['module']
-            new_dict = {key[len('module.discriminator.'):]: val for key,
-                        val in state_dict.items()}
-            self.discriminator.load_state_dict(new_dict)
-        print(
-            f'Cycle {self.config.cycle}: The Discriminator Erlangshen Load Successfully !\n')
-
     def train_dataloader(self):
         with torch_distributed_zero_first(self.global_rank):
             self.set_dis_dataset()
@@ -146,7 +130,7 @@ class DisSystem(LightningModule):
         score_sim_ds = generated_data.map(
             _generate_sim_sentence,
             batched=True,
-            batch_size=1536,
+            batch_size=1024,
             num_proc=1,
             cache_file_name=new_data_path + '/raw_cache')
         score_sim_ds = score_sim_ds.filter(lambda example: example['score'] != -5,

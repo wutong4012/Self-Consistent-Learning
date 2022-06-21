@@ -5,6 +5,7 @@ import datasets
 import torch
 from torch.utils.data import DataLoader, Dataset
 
+from system.utils import torch_distributed_zero_first
 from data_utlis.sim_data_collate import (discriminator_collate_fn,
                                          generator_collate_fn)
 
@@ -98,10 +99,11 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
             else:
                 torch.distributed.barrier()
 
-            sim_dataset = sim_dataset.filter(lambda example: example['score'] != -1,
-                                             cache_file_name=data_path+'/del_short_cache')
-            sim_dataset = sim_dataset.filter(lambda example: example['score'] != -2,
-                                             cache_file_name=data_path+'/del_bad_cache')
+            with torch_distributed_zero_first(rank):
+                sim_dataset = sim_dataset.filter(lambda example: example['score'] != -1,
+                                                cache_file_name=data_path+'/del_short_cache')
+                sim_dataset = sim_dataset.filter(lambda example: example['score'] != -2,
+                                                cache_file_name=data_path+'/del_bad_cache')
 
         elif attri == 'gen':
             if rank == 0:

@@ -10,7 +10,7 @@ ckpt_model_path: /cognitive_comp/wutong/similarity_generation/experiments/lightn
 
 wudao_data_path: /cognitive_comp/wutong/source/data_base/wudao_sentences
 #  _new中将一堆相似句完全相同的score设置为0 (59285条 -> 371424(Equal)+97192->495201(Bad)
-# 去掉了idea标注的数据，并且多了LCS<=2限制和最短长度5
+# 去掉了idea标注的数据，并且多了LCS<=2限制和最短长度10
 lab_data_path: /cognitive_comp/wutong/source/data_base/similarity_data/sim_cache_data_new
 gen_data_path: /cognitive_comp/wutong/source/data_base/sim_cycle_data/gen_sim_data
 score_data_path: /cognitive_comp/wutong/source/data_base/sim_cycle_data/score_sim_data
@@ -30,8 +30,8 @@ dis_hidden_size: 1024
 discriminator: 'IDEA-CCNL/Erlangshen-Roberta-330M-Similarity'
 
 gen_train_steps: 500
-dis_train_steps: 500
+dis_train_steps: 1000
 warmup_steps: 50
 checkpoint_steps: 10
 cycle_nums: 50
-cycle: 0
+cycle: 1
