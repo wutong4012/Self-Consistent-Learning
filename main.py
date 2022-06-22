@@ -48,7 +48,6 @@ def generator_cycle(config, gen_system):
     )
 
     torch.cuda.empty_cache()
-    gen_system.set_gen_dataset()
     gen_trainer.fit(gen_system)
     gen_system.generate_samples()
 
@@ -73,7 +72,6 @@ def discriminator_cycle(config, dis_system):
     )
     
     torch.cuda.empty_cache()
-    dis_system.set_dis_dataset()
     dis_trainer.fit(dis_system)
     dis_system.judge_similarity()
 
@@ -81,13 +79,13 @@ def discriminator_cycle(config, dis_system):
 @hydra.main(config_path='./', config_name='hyper_parameter')
 def run(config):
     torch.backends.cudnn.enabled = False
-    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.benchmark = False
     seed_everything(config.seed)
     
     gen_system = GenSystem(config)
     dis_system = DisSystem(config)
     
-    for idx in range(7, config.cycle_nums):
+    for idx in range(10, config.cycle_nums):
         config.cycle = idx
         print('Cycle: {}'.format(config.cycle))
 

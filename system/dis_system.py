@@ -58,6 +58,9 @@ class DisSystem(LightningModule):
                 'frequency': 1,
             }
         }
+        
+    def on_fit_start(self) -> None:
+        self.set_dis_dataset()
 
     def training_step(self, batch, batch_ids):
         torch.cuda.empty_cache()

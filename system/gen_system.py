@@ -24,7 +24,8 @@ class GenSystem(LightningModule):
 
     def set_gen_dataset(self):
         self.train_dataset, self.val_dataset = \
-            set_dataset(self.config, use_label=True, use_gen=True, attri='gen')
+            set_dataset(self.config, use_label=True, use_gen=True, 
+                        attri='gen', rank=self.global_rank)
 
     def _set_tokenizers_and_models(self):
         self.gen_tokenizer = T5Tokenizer.from_pretrained(
@@ -63,6 +64,9 @@ class GenSystem(LightningModule):
                 'frequency': 1,
             }
         }
+
+    def on_fit_start(self) -> None:
+        self.set_gen_dataset()
 
     def training_step(self, batch, batch_ids):
         torch.cuda.empty_cache()

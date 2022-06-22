@@ -1,6 +1,7 @@
 import glob
 import random
 
+import torch
 import datasets
 from torch.utils.data import DataLoader, Dataset
 
@@ -25,7 +26,15 @@ class SimGanDataset(Dataset):
         return self.data.num_rows
 
 
-def load_data(config, is_labeled=False, is_wudao=False,
+def torch_distributed_zero_first(local_rank):
+    if local_rank != 0:
+        torch.distributed.barrier()
+    yield
+    if local_rank == 0:
+        torch.distributed.barrier()
+
+
+def load_data(config, rank, is_labeled=False, is_wudao=False,
               is_score=False, attri=None):
     if is_wudao:
         cache_dict_paths = glob.glob(config.wudao_data_path + '/*')
@@ -49,7 +58,8 @@ def load_data(config, is_labeled=False, is_wudao=False,
                 data_path = config.gen_data_path + '_cycle_{}'.format(config.cycle)
         elif attri == 'gen':
             data_path = config.score_data_path + '_cycle_{}'.format(config.cycle)
-        print(f'Data Path: {data_path} !')
+        if rank == 0:
+            print(f'Data Path: {data_path} !')
         sim_dataset = datasets.load_from_disk(data_path)
 
         def LCS(str1, str2):
@@ -83,45 +93,52 @@ def load_data(config, is_labeled=False, is_wudao=False,
             cache_file_name=data_path+'/map_cache')
 
         if attri == 'dis':
-            cnt = sim_dataset.filter(lambda example: example['score'] == -1,
-                                     cache_file_name=data_path+'/short_cache').num_rows
-            print(f'There are {cnt} Short(<=10) Sentence!')
-            cnt = sim_dataset.filter(lambda example: example['score'] == -2,
-                                     cache_file_name=data_path+'/bad_cache').num_rows
-            print(f'There are {cnt} Bad Sentence!')
+            if rank == 0:
+                cnt = sim_dataset.filter(lambda example: example['score'] == -1,
+                                        cache_file_name=data_path+'/short_cache').num_rows
+                print(f'There are {cnt} Short(<=10) Sentence!')
+                cnt = sim_dataset.filter(lambda example: example['score'] == -2,
+                                        cache_file_name=data_path+'/bad_cache').num_rows
+                print(f'There are {cnt} Bad Sentence!')
+            torch.distributed.barrier()
 
-            sim_dataset = sim_dataset.filter(lambda example: example['score'] != -1,
-                                             cache_file_name=data_path+'/del_short_cache')
-            sim_dataset = sim_dataset.filter(lambda example: example['score'] != -2,
-                                             cache_file_name=data_path+'/del_bad_cache')
+            with torch_distributed_zero_first(rank):
+                sim_dataset = sim_dataset.filter(lambda example: example['score'] != -1,
+                                                 cache_file_name=data_path+'/del_short_cache')
+                sim_dataset = sim_dataset.filter(lambda example: example['score'] != -2,
+                                                 cache_file_name=data_path+'/del_bad_cache')
 
         elif attri == 'gen':
             cnt = sim_dataset.filter(lambda example: example['score'] == -3,
                                      cache_file_name=data_path+'/equal_cache').num_rows
-            print(f'There are {cnt} Equal Sentence!')
+            if rank == 0:
+                print(f'There are {cnt} Equal Sentence!')
+            torch.distributed.barrier()
 
     return sim_dataset
 
 
-def set_dataset(config, use_label, use_gen, attri=None):
+def set_dataset(config, use_label, use_gen, attri, rank):
     if use_label and not use_gen:
-        data = load_data(config, is_labeled=True)
+        data = load_data(config, rank, is_labeled=True)
     elif use_gen and not use_label:
-        data = load_data(config, is_labeled=False, attri=attri)
+        data = load_data(config, rank, is_labeled=False, attri=attri)
     elif use_gen and use_label:
-        labeled_data = load_data(config, is_labeled=True)
-        generated_data = load_data(config, is_labeled=False, attri=attri)
+        labeled_data = load_data(config, rank, is_labeled=True)
+        generated_data = load_data(config, rank, is_labeled=False, attri=attri)
 
         start, end = (config.cycle * generated_data.num_rows * 2), (
             (config.cycle + 1) * generated_data.num_rows * 2)
         part_labeled_data = labeled_data.select(range(start, end))
 
-        random_list = random.sample(range(part_labeled_data.num_rows), 10)
-        for i in random_list:
-            print('Labeled Examples: {}'.format(part_labeled_data[i]))
-        random_list = random.sample(range(generated_data.num_rows), 10)
-        for i in random_list:
-            print('Generated Examples: {}'.format(generated_data[i]))
+        if rank == 0:
+            random_list = random.sample(range(part_labeled_data.num_rows), 10)
+            for i in random_list:
+                print('Labeled Examples: {}'.format(part_labeled_data[i]))
+            random_list = random.sample(range(generated_data.num_rows), 10)
+            for i in random_list:
+                print('Generated Examples: {}'.format(generated_data[i]))
+        torch.distributed.barrier()
 
         if attri == 'dis':
             assert part_labeled_data.features.type == generated_data.features.type
@@ -145,18 +162,20 @@ def set_dataset(config, use_label, use_gen, attri=None):
                 data = datasets.concatenate_datasets(
                     [part_labeled_data, generated_data, negtived_data])
 
-            print('From Generated Data Positive Samples: ', generated_data.filter(
-                lambda example: example['score'] == 1,
-                cache_file_name=config.cache_data_path+'/gen_pos_cache_'+str(config.cycle)).num_rows)
-            print('From Generated Data Negtive Samples: ', generated_data.filter(
-                lambda example: example['score'] == 0,
-                cache_file_name=config.cache_data_path+'/gen_neg_cache_'+str(config.cycle)).num_rows)
-            print('All Positive Samples: ', data.filter(
-                lambda example: example['score'] == 1,
-                cache_file_name=config.cache_data_path+'/all_pos_cache_'+str(config.cycle)).num_rows)
-            print('All Negtive Samples: ', data.filter(
-                lambda example: example['score'] == 0,
-                cache_file_name=config.cache_data_path+'/all_neg_cache_'+str(config.cycle)).num_rows)
+            if rank == 0:
+                print('From Generated Data Positive Samples: ', generated_data.filter(
+                    lambda example: example['score'] == 1,
+                    cache_file_name=config.cache_data_path+'/gen_pos_cache_'+str(config.cycle)).num_rows)
+                print('From Generated Data Negtive Samples: ', generated_data.filter(
+                    lambda example: example['score'] == 0,
+                    cache_file_name=config.cache_data_path+'/gen_neg_cache_'+str(config.cycle)).num_rows)
+                print('All Positive Samples: ', data.filter(
+                    lambda example: example['score'] == 1,
+                    cache_file_name=config.cache_data_path+'/all_pos_cache_'+str(config.cycle)).num_rows)
+                print('All Negtive Samples: ', data.filter(
+                    lambda example: example['score'] == 0,
+                    cache_file_name=config.cache_data_path+'/all_neg_cache_'+str(config.cycle)).num_rows)
+            torch.distributed.barrier()
 
         elif attri == 'gen':
             part_labeled_data = part_labeled_data.filter(
@@ -168,8 +187,10 @@ def set_dataset(config, use_label, use_gen, attri=None):
             data = datasets.concatenate_datasets(
                 [part_labeled_data, generated_data])
 
-            print(f'All Gen-Data Samples is {data.num_rows}')
-            print(f'{generated_data.num_rows} Filter Samples From Generated Data')
+            if rank == 0:
+                print(f'All Gen-Data Samples is {data.num_rows}')
+                print(f'{generated_data.num_rows} Filter Samples From Generated Data')
+            torch.distributed.barrier()
 
     data = data.train_test_split(
         train_size=0.8, test_size=0.2, seed=config.seed,
