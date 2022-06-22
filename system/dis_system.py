@@ -96,7 +96,7 @@ class DisSystem(LightningModule):
             print('Staring Scoring...')
             if not os.path.exists(new_data_path):
                 os.makedirs(new_data_path)
-        generated_data = load_data(self.config, is_labeled=False,
+        generated_data = load_data(self.config, self.global_rank, is_labeled=False,
                                    is_score=True, attri='dis')
 
         def _generate_sim_sentence(example):

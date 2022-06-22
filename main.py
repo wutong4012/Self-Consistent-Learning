@@ -85,7 +85,7 @@ def run(config):
     gen_system = GenSystem(config)
     dis_system = DisSystem(config)
     
-    for idx in range(10, config.cycle_nums):
+    for idx in range(0, config.cycle_nums):
         config.cycle = idx
         print('Cycle: {}'.format(config.cycle))
 
