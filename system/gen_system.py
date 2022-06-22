@@ -25,8 +25,7 @@ class GenSystem(LightningModule):
 
     def set_gen_dataset(self):
         self.train_dataset, self.val_dataset = \
-            set_dataset(self.config, use_label=True, use_gen=True,
-                        rank=self.global_rank, attri='gen')
+            set_dataset(self.config, use_label=True, use_gen=True, attri='gen')
 
     def _set_tokenizers_and_models(self):
         self.gen_tokenizer = T5Tokenizer.from_pretrained(
@@ -39,7 +38,6 @@ class GenSystem(LightningModule):
 
     def train_dataloader(self):
         with torch_distributed_zero_first(self.global_rank):
-            self.set_gen_dataset()
             return create_dataloader(config=self.config, dataset=self.train_dataset,
                                      tokenizer=self.gen_tokenizer, attri='gen', shuffle=True)
 
@@ -91,14 +89,13 @@ class GenSystem(LightningModule):
         return loss
 
     def generate_samples(self):
+        new_data_path = self.config.gen_data_path + \
+            f'_cycle_{self.config.cycle + 1}'
         if self.global_rank == 0:
             print('Staring Generating...')
-            new_data_path = self.config.gen_data_path + \
-                f'_cycle_{self.config.cycle + 1}'
             if not os.path.exists(new_data_path):
                 os.makedirs(new_data_path)
-        wudao_data = load_data(
-            self.config, rank=self.global_rank, is_wudao=True)
+        wudao_data = load_data(self.config, is_wudao=True)
 
         def _generate_sim_sentence(example):
             torch.cuda.empty_cache()
@@ -159,7 +156,7 @@ class GenSystem(LightningModule):
         gen_sim_ds = wudao_data.map(
             _generate_sim_sentence,
             batched=True,
-            batch_size=128,
+            batch_size=192,
             num_proc=1,
             features=feats,
             cache_file_name=new_data_path + '/main_cache',

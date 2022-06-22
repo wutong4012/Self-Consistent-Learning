@@ -24,8 +24,7 @@ class DisSystem(LightningModule):
 
     def set_dis_dataset(self):
         self.train_dataset, self.val_dataset = \
-            set_dataset(self.config, use_label=True, use_gen=True,
-                        rank=self.global_rank, attri='dis')
+            set_dataset(self.config, use_label=True, use_gen=True, attri='dis')
 
     def _set_tokenizers_and_models(self):
         self.dis_tokenizer = BertTokenizer.from_pretrained(
@@ -34,7 +33,6 @@ class DisSystem(LightningModule):
 
     def train_dataloader(self):
         with torch_distributed_zero_first(self.global_rank):
-            self.set_dis_dataset()
             return create_dataloader(config=self.config, dataset=self.train_dataset,
                                      tokenizer=self.dis_tokenizer, attri='dis', shuffle=True)
 
@@ -92,13 +90,13 @@ class DisSystem(LightningModule):
         return loss
 
     def judge_similarity(self):
+        new_data_path = self.config.score_data_path + \
+            f'_cycle_{self.config.cycle + 1}'
         if self.global_rank == 0:
             print('Staring Scoring...')
-            new_data_path = self.config.score_data_path + \
-                f'_cycle_{self.config.cycle + 1}'
             if not os.path.exists(new_data_path):
                 os.makedirs(new_data_path)
-        generated_data = load_data(self.config, rank=self.global_rank, is_labeled=False,
+        generated_data = load_data(self.config, is_labeled=False,
                                    is_score=True, attri='dis')
 
         def _generate_sim_sentence(example):
@@ -130,7 +128,7 @@ class DisSystem(LightningModule):
         score_sim_ds = generated_data.map(
             _generate_sim_sentence,
             batched=True,
-            batch_size=1024,
+            batch_size=1280,
             num_proc=1,
             cache_file_name=new_data_path + '/raw_cache')
         score_sim_ds = score_sim_ds.filter(lambda example: example['score'] != -5,
@@ -141,6 +139,3 @@ class DisSystem(LightningModule):
 
             score_sim_ds.save_to_disk(new_data_path)
             print('score_data: done!!!')
-            torch.distributed.barrier()
-        else:
-            torch.distributed.barrier()

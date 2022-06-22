@@ -48,6 +48,7 @@ def generator_cycle(config, gen_system):
         early_stopping=gen_early_stopping,
     )
 
+    gen_system.set_gen_dataset()
     gen_trainer.fit(gen_system)
     gen_system.generate_samples()
 
@@ -72,6 +73,7 @@ def discriminator_cycle(config, dis_system):
         early_stopping=dis_early_stopping,
     )
     
+    dis_system.set_dis_dataset()
     dis_trainer.fit(dis_system)
     dis_system.judge_similarity()
 
@@ -85,7 +87,7 @@ def run(config):
     gen_system = GenSystem(config)
     dis_system = DisSystem(config)
     
-    for idx in range(3, config.cycle_nums):
+    for idx in range(5, config.cycle_nums):
         config.cycle = idx
         print('Cycle: {}'.format(config.cycle))
 
