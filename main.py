@@ -29,7 +29,6 @@ def set_trainer(config, ckpt_callback, early_stopping):
     
 
 def generator_cycle(config, gen_system):
-    torch.cuda.empty_cache()
     gen_ckpt_callback = ModelCheckpoint(
         save_top_k=1,
         monitor='gen_val_loss',
@@ -48,13 +47,13 @@ def generator_cycle(config, gen_system):
         early_stopping=gen_early_stopping,
     )
 
+    torch.cuda.empty_cache()
     gen_system.set_gen_dataset()
     gen_trainer.fit(gen_system)
     gen_system.generate_samples()
 
 
 def discriminator_cycle(config, dis_system):
-    torch.cuda.empty_cache()
     dis_ckpt_callback = ModelCheckpoint(
         save_top_k=1,
         monitor='dis_f1_score',
@@ -73,6 +72,7 @@ def discriminator_cycle(config, dis_system):
         early_stopping=dis_early_stopping,
     )
     
+    torch.cuda.empty_cache()
     dis_system.set_dis_dataset()
     dis_trainer.fit(dis_system)
     dis_system.judge_similarity()
@@ -80,14 +80,14 @@ def discriminator_cycle(config, dis_system):
 
 @hydra.main(config_path='./', config_name='hyper_parameter')
 def run(config):
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic=True
+    torch.backends.cudnn.enabled = False
+    torch.backends.cudnn.benchmark = True
     seed_everything(config.seed)
     
     gen_system = GenSystem(config)
     dis_system = DisSystem(config)
     
-    for idx in range(5, config.cycle_nums):
+    for idx in range(7, config.cycle_nums):
         config.cycle = idx
         print('Cycle: {}'.format(config.cycle))
 

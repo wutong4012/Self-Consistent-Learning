@@ -9,7 +9,6 @@ from transformers.optimization import AdamW, get_cosine_schedule_with_warmup
 from data_utlis.sim_gen_dataset import (create_dataloader, load_data,
                                         set_dataset)
 from model_utils.sim_gen_model import Discriminator
-from system.utils import torch_distributed_zero_first
 
 
 class DisSystem(LightningModule):
@@ -32,14 +31,12 @@ class DisSystem(LightningModule):
         self.discriminator = Discriminator(self.config)
 
     def train_dataloader(self):
-        with torch_distributed_zero_first(self.global_rank):
-            return create_dataloader(config=self.config, dataset=self.train_dataset,
-                                     tokenizer=self.dis_tokenizer, attri='dis', shuffle=True)
+        return create_dataloader(config=self.config, dataset=self.train_dataset,
+                                 tokenizer=self.dis_tokenizer, attri='dis', shuffle=True)
 
     def val_dataloader(self):
-        with torch_distributed_zero_first(self.global_rank):
-            return create_dataloader(config=self.config, dataset=self.val_dataset,
-                                     tokenizer=self.dis_tokenizer, attri='dis', shuffle=False)
+        return create_dataloader(config=self.config, dataset=self.val_dataset,
+                                 tokenizer=self.dis_tokenizer, attri='dis', shuffle=False)
 
     def configure_optimizers(self):
         optimizer = AdamW(
@@ -139,3 +136,4 @@ class DisSystem(LightningModule):
 
             score_sim_ds.save_to_disk(new_data_path)
             print('score_data: done!!!')
+        torch.distributed.barrier()

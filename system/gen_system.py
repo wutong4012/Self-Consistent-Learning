@@ -11,7 +11,6 @@ from transformers.optimization import AdamW, get_cosine_schedule_with_warmup
 from data_utlis.sample_sequence import sample_sequence_batch
 from data_utlis.sim_gen_dataset import create_dataloader, load_data, set_dataset
 from model_utils.sim_gen_model import Generator
-from system.utils import torch_distributed_zero_first
 
 
 class GenSystem(LightningModule):
@@ -37,14 +36,12 @@ class GenSystem(LightningModule):
         self.generator = Generator(self.config)
 
     def train_dataloader(self):
-        with torch_distributed_zero_first(self.global_rank):
-            return create_dataloader(config=self.config, dataset=self.train_dataset,
-                                     tokenizer=self.gen_tokenizer, attri='gen', shuffle=True)
+        return create_dataloader(config=self.config, dataset=self.train_dataset,
+                                 tokenizer=self.gen_tokenizer, attri='gen', shuffle=True)
 
     def val_dataloader(self):
-        with torch_distributed_zero_first(self.global_rank):
-            return create_dataloader(config=self.config, dataset=self.val_dataset,
-                                     tokenizer=self.gen_tokenizer, attri='gen', shuffle=False)
+        return create_dataloader(config=self.config, dataset=self.val_dataset,
+                                 tokenizer=self.gen_tokenizer, attri='gen', shuffle=False)
 
     def configure_optimizers(self):
         optimizer = AdamW(
@@ -125,8 +122,9 @@ class GenSystem(LightningModule):
                 top_k, top_p = 0, 0.95
             else:
                 top_k, top_p = 200, 0.9
+            self.generator.gen.cuda().eval()
             output_ids_list = sample_sequence_batch(
-                model=self.generator.gen.cuda(), context_tokens_tensor=input_ids.cuda(),
+                model=self.generator.gen, context_tokens_tensor=input_ids.cuda(),
                 context_length_tensor=length_tensor, repetition_penalty=1.5, max_out_seq=200,
                 end_token_id=50000, temperature=1.0, top_k=top_k, top_p=top_p,
             )
@@ -161,12 +159,11 @@ class GenSystem(LightningModule):
             features=feats,
             cache_file_name=new_data_path + '/main_cache',
             remove_columns=['sentence_list'])
-        
+        self.generator.gen.cpu()
+
         if self.global_rank == 0:
             print(f'Generate Data Samples is {gen_sim_ds.num_rows}')
 
             gen_sim_ds.save_to_disk(new_data_path)
             print('gen_data: done!!!')
-            torch.distributed.barrier()
-        else:
-            torch.distributed.barrier()
+        torch.distributed.barrier()
