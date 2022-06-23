@@ -1,9 +1,13 @@
+from re import L
 import hydra
+import argparse
+
 import torch
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.strategies.deepspeed import DeepSpeedStrategy
 from pytorch_lightning.callbacks import (LearningRateMonitor, ModelCheckpoint,
                                          EarlyStopping)
+from yaml import parse
 
 from system.gen_system import GenSystem
 from system.dis_system import DisSystem            
@@ -78,19 +82,16 @@ def discriminator_cycle(config, dis_system):
 
 @hydra.main(config_path='./', config_name='hyper_parameter')
 def run(config):
-    torch.backends.cudnn.enabled = False
-    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.enabled = True
+    torch.backends.cudnn.benchmark = True
     seed_everything(config.seed)
     
     gen_system = GenSystem(config)
     dis_system = DisSystem(config)
-    
-    for idx in range(1, config.cycle_nums):
-        config.cycle = idx
-        print('Cycle: {}'.format(config.cycle))
 
-        generator_cycle(config, gen_system)
-        discriminator_cycle(config, dis_system)
+    print('Cycle: {}'.format(config.cycle))
+    generator_cycle(config, gen_system)
+    discriminator_cycle(config, dis_system)
 
 
 if __name__ == '__main__':

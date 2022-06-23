@@ -220,7 +220,7 @@ def set_dataset(config, use_label, use_gen, attri, rank):
                 config, rank, part_labeled_data, generated_data)
 
     if rank > 0:
-        print(f'Rank {rank} waiting for main process to perform the filtering')
+        print(f'Rank {rank} waiting for main process to perform the spliting')
         torch.distributed.barrier()
     data = data.train_test_split(
         train_size=0.8, test_size=0.2, seed=config.seed,
