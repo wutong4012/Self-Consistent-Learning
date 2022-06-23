@@ -119,7 +119,7 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
 def set_dis_dataset(config, rank, start, end, 
                     part_labeled_data, generated_data, labeled_data):
     assert part_labeled_data.features.type == generated_data.features.type
-    if config.cycle < config.gen_anti_cyle:
+    if config.cycle <= config.gen_anti_cyle:
         if rank > 0:
             print(f'Rank {rank} waiting for main process to perform the filtering')
             torch.distributed.barrier()
