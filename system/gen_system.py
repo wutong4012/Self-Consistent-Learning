@@ -155,6 +155,9 @@ class GenSystem(LightningModule):
         feats = datasets.Features({"text1": datasets.Value('string'),
                                     "text2": datasets.Value('string'),
                                     "score": datasets.Value('int8')})
+        if self.global_rank > 0:
+            print(f'Rank {self.global_rank} waiting for main process to perform the mapping')
+            torch.distributed.barrier()
         gen_sim_ds = wudao_data.map(
             _generate_sim_sentence,
             batched=True,
@@ -163,6 +166,8 @@ class GenSystem(LightningModule):
             features=feats,
             cache_file_name=new_data_path + '/main_cache',
             remove_columns=['sentence_list'])
+        if self.global_rank == 0:
+            torch.distributed.barrier()
         self.generator.gen.cpu()
 
         if self.global_rank == 0:

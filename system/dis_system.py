@@ -23,7 +23,8 @@ class DisSystem(LightningModule):
 
     def set_dis_dataset(self):
         self.train_dataset, self.val_dataset = \
-            set_dataset(self.config, use_label=True, use_gen=True, attri='dis')
+            set_dataset(self.config, use_label=True, use_gen=True,
+                        attri='dis', rank=self.global_rank)
 
     def _set_tokenizers_and_models(self):
         self.dis_tokenizer = BertTokenizer.from_pretrained(
@@ -125,6 +126,9 @@ class DisSystem(LightningModule):
 
             return example
 
+        if self.global_rank > 0:
+            print(f'Rank {self.global_rank} waiting for main process to perform the mapping')
+            torch.distributed.barrier()
         score_sim_ds = generated_data.map(
             _generate_sim_sentence,
             batched=True,
@@ -133,6 +137,8 @@ class DisSystem(LightningModule):
             cache_file_name=new_data_path + '/raw_cache')
         score_sim_ds = score_sim_ds.filter(lambda example: example['score'] != -5,
                                            cache_file_name=new_data_path+'/main_cache')
+        if self.global_rank == 0:
+            torch.distributed.barrier()
         
         if self.global_rank == 0:
             print(f'Score Data Samples is {score_sim_ds.num_rows}')

@@ -26,14 +26,6 @@ class SimGanDataset(Dataset):
         return self.data.num_rows
 
 
-def torch_distributed_zero_first(local_rank):
-    if local_rank != 0:
-        torch.distributed.barrier()
-    yield
-    if local_rank == 0:
-        torch.distributed.barrier()
-
-
 def load_data(config, rank, is_labeled=False, is_wudao=False,
               is_score=False, attri=None):
     if is_wudao:
@@ -88,34 +80,114 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
                 elif delta <= 2 and attri == 'gen':
                     example['score'] = -3
             return example
+        if rank > 0:
+            print(f'Rank {rank} waiting for main process to perform the mapping')
+            torch.distributed.barrier()
         sim_dataset = sim_dataset.map(
-            process_equal,
-            cache_file_name=data_path+'/map_cache')
+            process_equal, cache_file_name=data_path+'/map_cache')
+        if rank == 0:
+            torch.distributed.barrier()
 
         if attri == 'dis':
             if rank == 0:
                 cnt = sim_dataset.filter(lambda example: example['score'] == -1,
-                                        cache_file_name=data_path+'/short_cache').num_rows
+                                         cache_file_name=data_path+'/short_cache').num_rows
                 print(f'There are {cnt} Short(<=10) Sentence!')
                 cnt = sim_dataset.filter(lambda example: example['score'] == -2,
-                                        cache_file_name=data_path+'/bad_cache').num_rows
+                                         cache_file_name=data_path+'/bad_cache').num_rows
                 print(f'There are {cnt} Bad Sentence!')
-            torch.distributed.barrier()
 
-            with torch_distributed_zero_first(rank):
-                sim_dataset = sim_dataset.filter(lambda example: example['score'] != -1,
-                                                 cache_file_name=data_path+'/del_short_cache')
-                sim_dataset = sim_dataset.filter(lambda example: example['score'] != -2,
-                                                 cache_file_name=data_path+'/del_bad_cache')
+            if rank > 0:
+                print(f'Rank {rank} waiting for main process to perform the filtering')
+                torch.distributed.barrier()
+            sim_dataset = sim_dataset.filter(lambda example: example['score'] != -1,
+                                             cache_file_name=data_path+'/del_short_cache')
+            sim_dataset = sim_dataset.filter(lambda example: example['score'] != -2,
+                                             cache_file_name=data_path+'/del_bad_cache')
+            if rank == 0:
+                torch.distributed.barrier()
 
         elif attri == 'gen':
-            cnt = sim_dataset.filter(lambda example: example['score'] == -3,
-                                     cache_file_name=data_path+'/equal_cache').num_rows
             if rank == 0:
+                cnt = sim_dataset.filter(lambda example: example['score'] == -3,
+                                         cache_file_name=data_path+'/equal_cache').num_rows
                 print(f'There are {cnt} Equal Sentence!')
-            torch.distributed.barrier()
 
     return sim_dataset
+
+
+def set_dis_dataset(config, rank, start, end, 
+                    part_labeled_data, generated_data, labeled_data):
+    assert part_labeled_data.features.type == generated_data.features.type
+    if config.cycle < config.gen_anti_cyle:
+        if rank > 0:
+            print(f'Rank {rank} waiting for main process to perform the filtering')
+            torch.distributed.barrier()
+        def filter_fn(example, idx):
+            return ((idx <= start) or (idx >= end)) and (example['score'] == 1)
+        positived_data = labeled_data.filter(
+            filter_fn, with_indices=True,
+            cache_file_name=config.cache_data_path+'/lab_pos_cache_'+str(config.cycle))
+        if rank == 0:
+            torch.distributed.barrier()
+
+        positived_data = positived_data.select(range(generated_data.num_rows))
+        data = datasets.concatenate_datasets(
+            [part_labeled_data, generated_data, positived_data])
+
+    else:
+        if rank > 0:
+            print(f'Rank {rank} waiting for main process to perform the filtering')
+            torch.distributed.barrier()
+        def filter_fn(example, idx):
+            return ((idx <= start) or (idx >= end)) and (example['score'] == 0)
+        negtived_data = labeled_data.filter(
+            filter_fn, with_indices=True,
+            cache_file_name=config.cache_data_path+'/lab_neg_cache_'+str(config.cycle))
+        if rank == 0:
+            torch.distributed.barrier()
+
+        negtived_data = negtived_data.select(range(generated_data.num_rows))
+        data = datasets.concatenate_datasets(
+            [part_labeled_data, generated_data, negtived_data])
+
+    if rank == 0:
+        print('From Generated Data Positive Samples: ', generated_data.filter(
+            lambda example: example['score'] == 1,
+            cache_file_name=config.cache_data_path+'/gen_pos_cache_'+str(config.cycle)).num_rows)
+        print('From Generated Data Negtive Samples: ', generated_data.filter(
+            lambda example: example['score'] == 0,
+            cache_file_name=config.cache_data_path+'/gen_neg_cache_'+str(config.cycle)).num_rows)
+        print('All Positive Samples: ', data.filter(
+            lambda example: example['score'] == 1,
+            cache_file_name=config.cache_data_path+'/all_pos_cache_'+str(config.cycle)).num_rows)
+        print('All Negtive Samples: ', data.filter(
+            lambda example: example['score'] == 0,
+            cache_file_name=config.cache_data_path+'/all_neg_cache_'+str(config.cycle)).num_rows)
+    
+    return data
+
+
+def set_gen_dataset(config, rank, part_labeled_data, generated_data):
+    if rank > 0:
+        print(f'Rank {rank} waiting for main process to perform the filtering')
+        torch.distributed.barrier()
+    part_labeled_data = part_labeled_data.filter(
+        lambda example: example['score'] == 1,
+        cache_file_name=config.cache_data_path+'/lab2gen_cache_'+str(config.cycle))
+    generated_data = generated_data.filter(
+        lambda example: example['score'] == 1,
+        cache_file_name=config.cache_data_path+'/gen2gen_cache_'+str(config.cycle))
+    if rank == 0:
+        torch.distributed.barrier()
+    data = datasets.concatenate_datasets(
+        [part_labeled_data, generated_data])
+
+    if rank == 0:
+        print(f'All Gen-Data Samples is {data.num_rows}')
+        print(f'{generated_data.num_rows} Filter Samples From Generated Data')
+        
+    return data
 
 
 def set_dataset(config, use_label, use_gen, attri, rank):
@@ -138,67 +210,28 @@ def set_dataset(config, use_label, use_gen, attri, rank):
             random_list = random.sample(range(generated_data.num_rows), 10)
             for i in random_list:
                 print('Generated Examples: {}'.format(generated_data[i]))
-        torch.distributed.barrier()
 
         if attri == 'dis':
-            assert part_labeled_data.features.type == generated_data.features.type
-            if config.cycle < config.gen_anti_cyle:
-                def filter_fn(example, idx):
-                    return ((idx <= start) or (idx >= end)) and (example['score'] == 1)
-                positived_data = labeled_data.filter(
-                    filter_fn, with_indices=True,
-                    cache_file_name=config.cache_data_path+'/lab_pos_cache_'+str(config.cycle))
-                positived_data = positived_data.select(range(generated_data.num_rows))
-                data = datasets.concatenate_datasets(
-                    [part_labeled_data, generated_data, positived_data])
-
-            else:
-                def filter_fn(example, idx):
-                    return ((idx <= start) or (idx >= end)) and (example['score'] == 0)
-                negtived_data = labeled_data.filter(
-                    filter_fn, with_indices=True,
-                    cache_file_name=config.cache_data_path+'/lab_neg_cache_'+str(config.cycle))
-                negtived_data = negtived_data.select(range(generated_data.num_rows))
-                data = datasets.concatenate_datasets(
-                    [part_labeled_data, generated_data, negtived_data])
-
-            if rank == 0:
-                print('From Generated Data Positive Samples: ', generated_data.filter(
-                    lambda example: example['score'] == 1,
-                    cache_file_name=config.cache_data_path+'/gen_pos_cache_'+str(config.cycle)).num_rows)
-                print('From Generated Data Negtive Samples: ', generated_data.filter(
-                    lambda example: example['score'] == 0,
-                    cache_file_name=config.cache_data_path+'/gen_neg_cache_'+str(config.cycle)).num_rows)
-                print('All Positive Samples: ', data.filter(
-                    lambda example: example['score'] == 1,
-                    cache_file_name=config.cache_data_path+'/all_pos_cache_'+str(config.cycle)).num_rows)
-                print('All Negtive Samples: ', data.filter(
-                    lambda example: example['score'] == 0,
-                    cache_file_name=config.cache_data_path+'/all_neg_cache_'+str(config.cycle)).num_rows)
-            torch.distributed.barrier()
+            data = set_dis_dataset(
+                config, rank, start, end, part_labeled_data, generated_data, labeled_data)
 
         elif attri == 'gen':
-            part_labeled_data = part_labeled_data.filter(
-                lambda example: example['score'] == 1,
-                cache_file_name=config.cache_data_path+'/lab2gen_cache_'+str(config.cycle))
-            generated_data = generated_data.filter(
-                lambda example: example['score'] == 1,
-                cache_file_name=config.cache_data_path+'/gen2gen_cache_'+str(config.cycle))
-            data = datasets.concatenate_datasets(
-                [part_labeled_data, generated_data])
+            data = set_gen_dataset(
+                config, rank, part_labeled_data, generated_data)
 
-            if rank == 0:
-                print(f'All Gen-Data Samples is {data.num_rows}')
-                print(f'{generated_data.num_rows} Filter Samples From Generated Data')
-            torch.distributed.barrier()
-
+    if rank > 0:
+        print(f'Rank {rank} waiting for main process to perform the filtering')
+        torch.distributed.barrier()
     data = data.train_test_split(
         train_size=0.8, test_size=0.2, seed=config.seed,
         train_indices_cache_file_name=config.cache_data_path+'/train'+attri+str(config.cycle),
         test_indices_cache_file_name=config.cache_data_path+'/test'+attri+str(config.cycle))
+    if rank == 0:
+        torch.distributed.barrier()
     train_dataset = SimGanDataset(data=data['train'])
     val_dataset = SimGanDataset(data=data['test'])
 
+    torch.distributed.barrier()
     return train_dataset, val_dataset
 
 
