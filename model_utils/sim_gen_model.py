@@ -87,7 +87,7 @@ class Generator(nn.Module):
         self.gen.load_state_dict(new_dict)
         print(f'Cycle {config.cycle}: The Generator Transformer-XL Load Successfully !\n')
 
-    def forward(self, gen_input_ids, lengths_input_ids, memory_attention_mask):
+    def forward(self, total_num, gen_input_ids, lengths_input_ids, memory_attention_mask):
         gen_output = self.gen.forward(
             input_ids=gen_input_ids,
             position_ids=None,
@@ -103,6 +103,7 @@ class Generator(nn.Module):
         
         lengths_input_ids = lengths_input_ids[..., 1:].contiguous()
         loss = (loss * (
-            (lengths_input_ids.view(-1) > 1).int()) / lengths_input_ids.view(-1)).sum() 
+            (lengths_input_ids.view(-1) > 1).int()) / lengths_input_ids.view(-1)
+        ).sum() / total_num 
         
         return loss, gen_output

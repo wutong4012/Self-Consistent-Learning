@@ -71,6 +71,7 @@ class GenSystem(LightningModule):
     def training_step(self, batch, batch_ids):
         torch.cuda.empty_cache()
         loss, _ = self.generator.forward(
+            batch['total_num'].cuda(),
             batch['prompts_input_ids'].cuda(),
             batch['lengths_input_ids'].cuda(),
             batch['prompts_attention_mask'].cuda(),
@@ -81,6 +82,7 @@ class GenSystem(LightningModule):
     def validation_step(self, batch, batch_ids):
         torch.cuda.empty_cache()
         loss, _ = self.generator.forward(
+            batch['total_num'].cuda(),
             batch['prompts_input_ids'].cuda(),
             batch['lengths_input_ids'].cuda(),
             batch['prompts_attention_mask'].cuda()
@@ -127,7 +129,7 @@ class GenSystem(LightningModule):
             else:
                 top_k, top_p = 200, 0.9
             self.generator.gen.cuda().eval()
-            output_ids_list = sample_sequence_batch(
+            output_ids_list, probs_list = sample_sequence_batch(
                 model=self.generator.gen, context_tokens_tensor=input_ids.cuda(),
                 context_length_tensor=length_tensor, repetition_penalty=1.5, max_out_seq=200,
                 end_token_id=50000, temperature=1.0, top_k=top_k, top_p=top_p,

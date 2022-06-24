@@ -31,7 +31,7 @@ def generator_collate_fn(batch_data, tokenizer, real_batch_size, is_train):
         model_inputs: {nosiy_text1, text2}
         prompt: <bos>“<第一句>”的相似句是“<第二句>”<eos>
     """
-    max_length = 400
+    max_length, total_num = 400, 0
     prompts, lengths, attention_mask = [], [], []
     prompts_input_ids, lengths_input_ids, prompts_attention_mask = [], [], []
     for item in batch_data:
@@ -51,7 +51,7 @@ def generator_collate_fn(batch_data, tokenizer, real_batch_size, is_train):
         text2_ids = tokenizer(
             '“' + item['text2'] + '”', return_tensors='pt').input_ids.squeeze()[1:]
         length = torch.tensor([1] * (len(prompt) - len(text2_ids)) + \
-            [len(prompt)] * len(text2_ids))
+            [len(text2_ids)] * len(text2_ids))
     
         if len(prompt) <= max_length:
             max_length -= len(prompt)
@@ -64,6 +64,7 @@ def generator_collate_fn(batch_data, tokenizer, real_batch_size, is_train):
             attention_mask.append(mask)
 
             prompts.append(prompt)
+            total_num += 1
             lengths.append(length)
 
         #  还有可能没到最大长度数据就拼完了
@@ -96,6 +97,7 @@ def generator_collate_fn(batch_data, tokenizer, real_batch_size, is_train):
         prompts_attention_mask, max_seq_length)
 
     return {
+        'total_num': torch.tensor(total_num),
         'prompts_input_ids': prompts_input_ids,
         'lengths_input_ids': lengths_input_ids,
         'prompts_attention_mask': prompts_attention_mask,

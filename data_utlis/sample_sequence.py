@@ -1,4 +1,5 @@
 import torch
+import math
 import torch.nn.functional as F
 
 
@@ -90,8 +91,8 @@ def sample_sequence_batch(model, context_tokens_tensor, context_length_tensor, m
         end_token_id = 50000
     if max_out_seq is None:
         max_out_seq = 512
-
-    output_tokens_lists = []
+    log_probs_tensor = torch.tensor([0.0] * batch_size)
+    output_tokens_lists, log_probs_list = [], []
     with torch.no_grad():
         # while counter < (max_out_seq - org_context_length):
         while counter < max_out_seq:
@@ -105,29 +106,35 @@ def sample_sequence_batch(model, context_tokens_tensor, context_length_tensor, m
             logits = logits[:, -1]
             logits /= temperature
             logits = top_k_logits(logits, top_k=top_k, top_p=top_p)
-            log_probs = F.softmax(logits, dim=-1)
-
+            log_probs = F.softmax(logits, dim=-1)  # [bs, vocab_size]
             if repetition_penalty != 1.0:
                 for bz in range(batch_size):
                     enforce_repetition_penalty(log_probs[bz, :], tokens[bz, :], repetition_penalty)
 
-            prev = torch.multinomial(log_probs, num_samples=1).view(-1)
+            prev = torch.multinomial(log_probs, num_samples=1).view(-1)  # [bs]
 
             if index < torch.max(context_length_tensor).item():
                 prev = switch(
                     prev, context_tokens_tensor[:, index], context_length_tensor <= index)
+            for i in range(batch_size):
+                if index > context_length_tensor[i] and prev[i] != end_token_id:
+                    log_probs_tensor[i] += math.log(log_probs[i][prev][i])
+                if prev[i] == end_token_id:
+                    log_probs_tensor[i] /= (context_length_tensor[i] - index)
 
             if torch.all(prev == end_token_id).item():
                 break
 
             finished = tokens[prev == end_token_id]
             output_tokens_lists.extend(finished.detach().cpu().tolist())
+            log_probs_list.extend(log_probs_tensor[prev == end_token_id])
 
             # continue with non-ending tokens
             conti_idx = (prev != end_token_id)
             tokens, prev = tokens[conti_idx], prev[conti_idx]
             context_tokens_tensor = context_tokens_tensor[conti_idx]
             context_length_tensor = context_length_tensor[conti_idx]
+            log_probs_tensor = log_probs_tensor[conti_idx]
             batch_size = tokens.shape[0]
             for im in range(len(mems)):
                 mems[im] = mems[im][conti_idx, :, :]
@@ -137,9 +144,11 @@ def sample_sequence_batch(model, context_tokens_tensor, context_length_tensor, m
             counter += 1
 
     output_tokens_lists.extend(tokens.detach().cpu().tolist())
+    log_probs_list.extend(log_probs_tensor)
     output_tokens_lists = [tokens[:tokens.index(
         end_token_id)] if end_token_id in tokens else tokens for tokens in output_tokens_lists]
-    return output_tokens_lists
+    log_probs_list = [math.exp(i) for i in log_probs_list]
+    return output_tokens_lists, log_probs_list
 
 
 def sample_sequence(model, tokens, attention_mask, do_sampling=True,
