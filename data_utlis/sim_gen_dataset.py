@@ -88,7 +88,7 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
             torch.distributed.barrier()
         sim_dataset = sim_dataset.map(
             process_equal, cache_file_name=data_path+'/map_cache')
-        if rank == 0:
+        if rank == 0 and config.cycle != -1:
             torch.distributed.barrier()
 
         if attri == 'dis':
@@ -107,7 +107,7 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
                                              cache_file_name=data_path+'/del_short_cache')
             sim_dataset = sim_dataset.filter(lambda example: example['score'] != -2,
                                              cache_file_name=data_path+'/del_bad_cache')
-            if rank == 0:
+            if rank == 0 and config.cycle != -1:
                 torch.distributed.barrier()
 
         elif attri == 'gen':

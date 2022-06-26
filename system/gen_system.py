@@ -175,7 +175,7 @@ class GenSystem(LightningModule):
             features=feats,
             cache_file_name=new_data_path + '/main_cache',
             remove_columns=['sentence_list'])
-        if self.global_rank == 0:
+        if self.global_rank == 0 and self.config.cycle != -1:
             torch.distributed.barrier()
         self.generator.gen.cpu()
 
@@ -184,4 +184,5 @@ class GenSystem(LightningModule):
 
             gen_sim_ds.save_to_disk(new_data_path)
             print('gen_data: done!!!')
-        torch.distributed.barrier()
+        if self.config.cycle != -1:
+            torch.distributed.barrier()

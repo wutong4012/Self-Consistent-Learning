@@ -137,7 +137,7 @@ class DisSystem(LightningModule):
             cache_file_name=new_data_path + '/raw_cache')
         score_sim_ds = score_sim_ds.filter(lambda example: example['score'] != -5,
                                            cache_file_name=new_data_path+'/main_cache')
-        if self.global_rank == 0:
+        if self.global_rank == 0 and self.config.cycle != -1:
             torch.distributed.barrier()
         
         if self.global_rank == 0:
@@ -145,4 +145,5 @@ class DisSystem(LightningModule):
 
             score_sim_ds.save_to_disk(new_data_path)
             print('score_data: done!!!')
-        torch.distributed.barrier()
+        if self.config.cycle != -1:
+            torch.distributed.barrier()

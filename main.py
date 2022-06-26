@@ -98,8 +98,7 @@ def run(config):
     if config.cycle == -1:
         gen_system.generate_samples()
         dis_system.judge_similarity()
-        config.cycle += 1
-        print('Cycle: {}'.format(config.cycle))
+        return
     
     generator_cycle(config, gen_system)
     discriminator_cycle(config, dis_system)
