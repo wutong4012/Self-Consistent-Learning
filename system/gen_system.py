@@ -127,15 +127,22 @@ class GenSystem(LightningModule):
             if self.config.cycle < self.config.gen_anti_cyle:
                 top_k, top_p = 0, 0.95
             else:
-                top_k, top_p = 200, 0.9
+                top_k, top_p = 500, 0.95
             self.generator.gen.cuda().eval()
-            output_ids_list, probs_list = sample_sequence_batch(
+            output_ids_list, ppl_list = sample_sequence_batch(
                 model=self.generator.gen, context_tokens_tensor=input_ids.cuda(),
                 context_length_tensor=length_tensor, repetition_penalty=1.5, max_out_seq=200,
                 end_token_id=50000, temperature=1.0, top_k=top_k, top_p=top_p,
             )
+
+            ppl = torch.softmax(torch.tensor(ppl_list), dim=0)
+            real_output_list = []
+            for i in range(len(output_ids_list)):
+                if ppl[i] <= 1 / len(ppl_list):
+                    real_output_list.append(output_ids_list[i])
             sim_sentence = self.gen_tokenizer.batch_decode(
-                output_ids_list, skip_special_tokens=True)
+                real_output_list, skip_special_tokens=True)
+            print(f'There are dropped {len(output_ids_list) - len(real_output_list)} samples!')
 
             raw_text, sim_text = [], []
             for item in sim_sentence:
@@ -163,7 +170,7 @@ class GenSystem(LightningModule):
         gen_sim_ds = wudao_data.map(
             _generate_sim_sentence,
             batched=True,
-            batch_size=192,
+            batch_size=512,
             num_proc=1,
             features=feats,
             cache_file_name=new_data_path + '/main_cache',

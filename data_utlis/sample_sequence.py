@@ -118,7 +118,7 @@ def sample_sequence_batch(model, context_tokens_tensor, context_length_tensor, m
                     prev, context_tokens_tensor[:, index], context_length_tensor <= index)
             for i in range(batch_size):
                 if index > context_length_tensor[i] and prev[i] != end_token_id:
-                    log_probs_tensor[i] += math.log(log_probs[i][prev][i])
+                    log_probs_tensor[i] += math.log(log_probs[i][prev][i] + 1e-6)
                 if prev[i] == end_token_id:
                     log_probs_tensor[i] /= (context_length_tensor[i] - index)
 
@@ -147,8 +147,8 @@ def sample_sequence_batch(model, context_tokens_tensor, context_length_tensor, m
     log_probs_list.extend(log_probs_tensor)
     output_tokens_lists = [tokens[:tokens.index(
         end_token_id)] if end_token_id in tokens else tokens for tokens in output_tokens_lists]
-    log_probs_list = [math.exp(i) for i in log_probs_list]
-    return output_tokens_lists, log_probs_list
+    ppl_list = [math.exp(i) for i in log_probs_list]
+    return output_tokens_lists, ppl_list
 
 
 def sample_sequence(model, tokens, attention_mask, do_sampling=True,

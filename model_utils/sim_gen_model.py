@@ -4,8 +4,6 @@ import torch
 import torch.nn as nn
 from transformers import BertForSequenceClassification
 
-from model_utils.gpt2_modeling import GPT2Model
-
 
 class Discriminator(nn.Module):
 
@@ -15,7 +13,7 @@ class Discriminator(nn.Module):
         self.dis = BertForSequenceClassification.from_pretrained(
             config.discriminator, num_labels=2)
 
-        if config.cycle == 0:
+        if config.cycle == 0 or config.cycle == -1:
             pt_path = config.dis_model_path
         else:
             pt_path = config.ckpt_model_path + \
@@ -53,6 +51,10 @@ class Generator(nn.Module):
 
         with open(config.txl_config_path, 'r') as f:
             txl_config = json.load(f)
+        if config.cycle == -1:
+            from model_utils.gpt2_for_inference import GPT2Model
+        else:
+            from model_utils.gpt2_modeling import GPT2Model
         self.gen = GPT2Model(
             num_layers=txl_config['num_layers'],
             vocab_size=txl_config['vocab_size'],
@@ -69,7 +71,7 @@ class Generator(nn.Module):
             relative_encoding=txl_config['relative_encoding']
         )
         
-        if config.cycle == 0:
+        if config.cycle == 0 or config.cycle == -1:
             pt_path = config.txl_model_path
         else:
             pt_path = config.ckpt_model_path +\

@@ -25,7 +25,7 @@ def load_wudao_data():
     wudao_ds, res = [], []
     p = ProcessPoolExecutor(max_workers=1)
 
-    for path in cache_dict_paths[:_NUM_FILES]:
+    for path in cache_dict_paths[-_NUM_FILES:]:
         res.append(p.submit(datasets.load_from_disk, path))
     p.shutdown(wait=True)
     for future in res:
@@ -84,13 +84,15 @@ def generate_arrow_cache(num_proc=1) -> None:
                 continue
 
             # 每段话只随机选一条句子
-            random.seed(42)
             random_num = random.sample(range(len(item)), 1)[0]
             cur_input_ids = gen_tokenizer(
-                '<bos>“' + item[random_num] + '”的相似句是“', return_tensors='pt').input_ids.squeeze()[:-1]  # 不能加<eos>
+                '<bos>“' + item[random_num] + '”的相似句是“', return_tensors='pt'
+            ).input_ids.squeeze()[:-1]  # 不能加<eos>
 
-            length = [cur_input_ids.size(0)] * 5
-            cur_input_ids = [cur_input_ids] * 5
+            # 每个样本复制几份
+            length = [cur_input_ids.size(0)] * 1
+            cur_input_ids = [cur_input_ids] * 1
+
             length_list.extend(length)
             input_ids.extend(cur_input_ids)
 
@@ -98,34 +100,46 @@ def generate_arrow_cache(num_proc=1) -> None:
             [x for x in input_ids], batch_first=True, padding_value=50000)
         length_tensor = torch.tensor(length_list)
 
-        output_ids_list = sample_sequence_batch(
-            model=generator.cuda(), context_tokens_tensor=input_ids.cuda(), context_length_tensor=length_tensor,
-            repetition_penalty=1.5, max_out_seq=200, end_token_id=50000, temperature=1.0, top_k=0, top_p=0.95,
+        top_k, top_p = 500, 0.95
+        generator.cuda().eval()
+        output_ids_list, ppl_list = sample_sequence_batch(
+            model=generator, context_tokens_tensor=input_ids.cuda(),
+            context_length_tensor=length_tensor, repetition_penalty=1.5, max_out_seq=200,
+            end_token_id=50000, temperature=1.0, top_k=top_k, top_p=top_p,
         )
-        sim_sentence = gen_tokenizer.batch_decode(output_ids_list, skip_special_tokens=True)
+
+        ppl = torch.softmax(torch.tensor(ppl_list), dim=0)
+        real_output_list = []
+        for i in range(len(output_ids_list)):
+            if ppl[i] <= 1 / len(ppl_list):
+                real_output_list.append(output_ids_list[i])
+        sim_sentence = gen_tokenizer.batch_decode(
+            real_output_list, skip_special_tokens=True)
+        print(f'There are dropped {len(output_ids_list) - len(real_output_list)} samples!')
 
         raw_text, sim_text = [], []
         for item in sim_sentence:
             if item.count('”的相似句是“') != 1 or (
-                item.count('“') % 2 != 0 or item.count('”') % 2 != 0
-            ) or len(item) <= 10:
+                item.count('“') % 2 != 0 or item.count('”') % 2 != 0):
                 continue
 
             item = item.replace(' ', '').split('”的相似句是“')
             raw_text.append(item[0][1:])
             sim_text.append(item[1][:-1])
-        score = [0] * len(raw_text)
 
-        return {'text1': raw_text, 'text2': sim_text, 'score': score}
+        scores = [1] * len(raw_text)
 
-    feats = datasets.Features({"text1": datasets.Value('string'), 
-                               "text2": datasets.Value('string'), 
-                               "score": datasets.Value('int8')})
+        return {'text1': raw_text, 'text2': sim_text, 'score': scores}
+
+    feats = datasets.Features({"text1": datasets.Value('string'),
+                                "text2": datasets.Value('string'),
+                                "score": datasets.Value('int8')})
+
     gen_sim_ds = wudao_ds.map(
         _generate_sim_sentence,
         batched=True,
-        batch_size=256,
-        num_proc=num_proc,
+        batch_size=512,
+        num_proc=1,
         features=feats,
         remove_columns=['sentence_list'])
     print(gen_sim_ds)

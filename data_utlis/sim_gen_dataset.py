@@ -30,8 +30,11 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
               is_score=False, attri=None):
     if is_wudao:
         cache_dict_paths = glob.glob(config.wudao_data_path + '/*')
-        data_path = cache_dict_paths[config.cycle]
-        wudao_ds = datasets.load_from_disk(data_path)
+        cache_dict_paths = cache_dict_paths[(config.cycle+1)*3:(config.cycle+2)*3]
+        wudao_ds_list = []
+        for path in cache_dict_paths:
+            wudao_ds_list.append(datasets.load_from_disk(path))
+        wudao_ds = datasets.concatenate_datasets(wudao_ds_list)
         return wudao_ds
 
     if is_labeled:  # 1590792 -> 1488200 -> 1391008
