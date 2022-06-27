@@ -30,7 +30,7 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
               is_score=False, attri=None):
     if is_wudao:
         cache_dict_paths = glob.glob(config.wudao_data_path + '/*')
-        cache_dict_paths = cache_dict_paths[(config.cycle+1)*3:(config.cycle+2)*3]
+        cache_dict_paths = cache_dict_paths[(config.cycle+1)*2:(config.cycle+2)*2]
         wudao_ds_list = []
         for path in cache_dict_paths:
             wudao_ds_list.append(datasets.load_from_disk(path))
@@ -122,37 +122,37 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
 def set_dis_dataset(config, rank, start, end, 
                     part_labeled_data, generated_data, labeled_data):
     assert part_labeled_data.features.type == generated_data.features.type
-    if config.cycle <= config.gen_anti_cyle:
-        if rank > 0:
-            print(f'Rank {rank} waiting for main process to perform the filtering')
-            torch.distributed.barrier()
-        def filter_fn(example, idx):
-            return ((idx <= start) or (idx >= end)) and (example['score'] == 1)
-        positived_data = labeled_data.filter(
-            filter_fn, with_indices=True,
-            cache_file_name=config.cache_data_path+'/lab_pos_cache_'+str(config.cycle))
-        if rank == 0:
-            torch.distributed.barrier()
+    # if config.cycle <= config.gen_anti_cyle:
+    if rank > 0:
+        print(f'Rank {rank} waiting for main process to perform the filtering')
+        torch.distributed.barrier()
+    def filter_fn(example, idx):
+        return ((idx <= start) or (idx >= end)) and (example['score'] == 1)
+    positived_data = labeled_data.filter(
+        filter_fn, with_indices=True,
+        cache_file_name=config.cache_data_path+'/lab_pos_cache_'+str(config.cycle))
+    if rank == 0:
+        torch.distributed.barrier()
 
-        positived_data = positived_data.select(range(generated_data.num_rows))
-        data = datasets.concatenate_datasets(
-            [part_labeled_data, generated_data, positived_data])
+    positived_data = positived_data.select(range(generated_data.num_rows))
+    data = datasets.concatenate_datasets(
+        [part_labeled_data, generated_data, positived_data])
 
-    else:
-        if rank > 0:
-            print(f'Rank {rank} waiting for main process to perform the filtering')
-            torch.distributed.barrier()
-        def filter_fn(example, idx):
-            return ((idx <= start) or (idx >= end)) and (example['score'] == 0)
-        negtived_data = labeled_data.filter(
-            filter_fn, with_indices=True,
-            cache_file_name=config.cache_data_path+'/lab_neg_cache_'+str(config.cycle))
-        if rank == 0:
-            torch.distributed.barrier()
+    # else:
+    #     if rank > 0:
+    #         print(f'Rank {rank} waiting for main process to perform the filtering')
+    #         torch.distributed.barrier()
+    #     def filter_fn(example, idx):
+    #         return ((idx <= start) or (idx >= end)) and (example['score'] == 0)
+    #     negtived_data = labeled_data.filter(
+    #         filter_fn, with_indices=True,
+    #         cache_file_name=config.cache_data_path+'/lab_neg_cache_'+str(config.cycle))
+    #     if rank == 0:
+    #         torch.distributed.barrier()
 
-        negtived_data = negtived_data.select(range(generated_data.num_rows))
-        data = datasets.concatenate_datasets(
-            [part_labeled_data, generated_data, negtived_data])
+    #     negtived_data = negtived_data.select(range(generated_data.num_rows))
+    #     data = datasets.concatenate_datasets(
+    #         [part_labeled_data, generated_data, negtived_data])
 
     if rank == 0:
         print('From Generated Data Positive Samples: ', generated_data.filter(

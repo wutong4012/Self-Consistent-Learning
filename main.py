@@ -12,12 +12,12 @@ from system.dis_system import DisSystem
 
 def set_trainer(config, ckpt_callback, early_stopping, attri):
     lr_callback = LearningRateMonitor(logging_interval='step')
-    if attri == 'dis':
-        max_epochs = 1
-        callbacks = [lr_callback, ckpt_callback]
-    elif attri == 'gen':
-        max_epochs = 1
-        callbacks = [lr_callback, ckpt_callback]
+    # if attri == 'dis':
+    max_epochs = 20
+    callbacks = [lr_callback, ckpt_callback, early_stopping]
+    # elif attri == 'gen':
+    #     max_epochs = 1
+    #     callbacks = [lr_callback, ckpt_callback]
     trainer = Trainer(
         default_root_dir=config.exp_dir,
         gpus=8,
@@ -43,15 +43,15 @@ def generator_cycle(config, gen_system):
         filename=f'generator_cycle_{config.cycle + 1}',
         dirpath=config.ckpt_model_path,
     )
-    # gen_early_stopping = EarlyStopping(
-    #     monitor='gen_val_loss',
-    #     patience=2,
-    #     mode='min'
-    # )
+    gen_early_stopping = EarlyStopping(
+        monitor='gen_val_loss',
+        patience=1,
+        mode='min'
+    )
     gen_trainer = set_trainer(
         config=config, 
         ckpt_callback=gen_ckpt_callback, 
-        early_stopping=None,
+        early_stopping=gen_early_stopping,
         attri='gen',
     )
 
@@ -68,15 +68,15 @@ def discriminator_cycle(config, dis_system):
         filename=f'discriminator_cycle_{config.cycle + 1}',
         dirpath=config.ckpt_model_path,
     )
-    # dis_early_stopping = EarlyStopping(
-    #     monitor='dis_f1_score',
-    #     patience=2,
-    #     mode='max'
-    # )
+    dis_early_stopping = EarlyStopping(
+        monitor='dis_f1_score',
+        patience=1,
+        mode='max'
+    )
     dis_trainer = set_trainer(
         config=config,
         ckpt_callback=dis_ckpt_callback,
-        early_stopping=None,
+        early_stopping=dis_early_stopping,
         attri='dis',
     )
     
