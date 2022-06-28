@@ -112,6 +112,3 @@ class DisSystem(LightningModule):
             'text2': batch['text2'],
             'logits': logits,
         }
-
-    def on_predict_epoch_end(self, results):
-        return self.all_gather(results)

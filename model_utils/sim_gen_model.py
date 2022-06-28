@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 from transformers import BertForSequenceClassification
 
+from model_utils.gpt2_modeling import GPT2Model
+
 
 class Discriminator(nn.Module):
 
@@ -54,10 +56,6 @@ class Generator(nn.Module):
 
         with open(config.txl_config_path, 'r') as f:
             txl_config = json.load(f)
-        if config.cycle == -1:
-            from model_utils.gpt2_for_inference import GPT2Model
-        else:
-            from model_utils.gpt2_modeling import GPT2Model
         self.gen = GPT2Model(
             num_layers=txl_config['num_layers'],
             vocab_size=txl_config['vocab_size'],

@@ -108,7 +108,3 @@ class GenSystem(LightningModule):
         )
 
         return output_dict
-
-    def on_predict_epoch_end(self, results):  # List[Dict]->len = batch_num
-        print(len(results))
-        return self.all_gather(results)

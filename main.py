@@ -1,5 +1,6 @@
 import gc
 import hydra
+from collections import defaultdict
 
 import torch
 from pytorch_lightning import Trainer, seed_everything
@@ -8,7 +9,8 @@ from pytorch_lightning.callbacks import (LearningRateMonitor, ModelCheckpoint,
                                          EarlyStopping)
 
 from system.gen_system import GenSystem
-from system.dis_system import DisSystem      
+from system.dis_system import DisSystem     
+from data_utlis.dist_gather import all_gather 
 from data_utlis.predict_dataset import gen_postprocess, dis_postprocess      
             
 
@@ -29,6 +31,17 @@ def set_trainer(config, ckpt_callback, early_stopping):
     )
 
     return trainer
+
+
+def concat_data(raw_list):  # List[Dict]<-(world_size, batch_num)
+    concate_output = defaultdict(list)
+    for item_list in raw_list:
+        print(len(item_list))
+        for batch in item_list:
+            for key in batch.keys():
+                concate_output[key].extend(batch[key])
+    
+    return concate_output
     
 
 def generator_cycle(config, gen_system):
@@ -52,13 +65,12 @@ def generator_cycle(config, gen_system):
 
     torch.cuda.empty_cache()
     if config.cycle == -1:
-        gen_output = gen_trainer.predict(gen_system)
-        print(gen_output.size())
+        gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
         gen_postprocess(gen_output, gen_system.gen_tokenizer, config)
     
     else:
         gen_trainer.fit(gen_system)
-        gen_output = gen_trainer.predict(gen_system)
+        gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
         gen_postprocess(gen_output, gen_system.gen_tokenizer, config)
 
 
@@ -83,13 +95,12 @@ def discriminator_cycle(config, dis_system):
     
     torch.cuda.empty_cache()
     if config.cycle == -1:
-        dis_output = dis_trainer.predict(dis_system)
-        print(dis_output.size())
+        dis_output = concat_data(all_gather(dis_trainer.predict(dis_system)))
         dis_postprocess(dis_output, config)
     
     else:
         dis_trainer.fit(dis_system)
-        dis_output = dis_trainer.predict(dis_system)
+        dis_output = concat_data(all_gather(dis_trainer.predict(dis_system)))
         dis_postprocess(dis_output, config)
 
 

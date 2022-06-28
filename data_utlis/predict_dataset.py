@@ -3,7 +3,6 @@ import random
 
 import torch
 import datasets
-import torch.nn.functional as F
 from datasets import Dataset
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
@@ -43,12 +42,12 @@ def multiply_pre_score(config, raw_dataset):
                 None)
             real_logits.append(logits[1].item())
     discriminator.to('cpu')
-    logits_list = F.softmax(real_logits)
+    logits_list = torch.softmax(torch.tensor(real_logits)).numpy().tolist()
 
     multi_logits = []
     for idx in range(raw_dataset.num_rows):
         multi_logits.append(logits_list[idx] * raw_dataset[idx]['-ppl'])
-    multi_logits = F.softmax(multi_logits)
+    multi_logits = torch.softmax(torch.tensor(multi_logits)).numpy().tolist()
 
     scores = []
     for idx in range(len(multi_logits)):
@@ -80,7 +79,7 @@ def gen_postprocess(output_dict, gen_tokenizer, config):
         sim_text.append(item[1][:-1])
         real_ppl_list.append(-output_dict['ppl_list'][idx])  # 加上负号，使其越大越好
 
-    ppl_list = F.softmax(real_ppl_list)
+    ppl_list = torch.softmax(torch.tensor(real_ppl_list)).numpy().tolist()
     raw_dataset = Dataset.from_dict({
         'text1': raw_text,
         'text2': sim_text,
@@ -177,7 +176,8 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
     if attri == 'gen':
         batch_size = config.pre_gen_bs
 
-        wudao_ds = load_data(config, rank, is_wudao=True)[:20]  # TODO
+        wudao_ds = load_data(config, rank, is_wudao=True)
+        wudao_ds = wudao_ds.select(range(80))  # TODO
         predict_dataset = SimGanDataset(wudao_ds)
 
         def collate_fn(batch_data):
@@ -186,7 +186,8 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
     elif attri == 'dis':
         batch_size = config.pre_dis_bs
 
-        gen_ds = load_data(config, rank, is_score=True, attri='dis')[:20]  # TODO
+        gen_ds = load_data(config, rank, is_score=True, attri='dis')
+        gen_ds = gen_ds.select(range(80))  # TODO
         predict_dataset = SimGanDataset(gen_ds)
 
         def collate_fn(batch_data):

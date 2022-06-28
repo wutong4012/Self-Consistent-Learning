@@ -120,7 +120,7 @@ def sample_sequence_batch(model, context_tokens_tensor, context_length_tensor, m
                 if index > context_length_tensor[i] and prev[i] != end_token_id:
                     log_probs_tensor[i] += math.log(log_probs[i][prev][i] + 1e-6)
                 if prev[i] == end_token_id:
-                    log_probs_tensor[i] /= (context_length_tensor[i] - index)
+                    log_probs_tensor[i] /= (context_length_tensor[i].cpu() - index)
 
             if torch.all(prev == end_token_id).item():
                 break
