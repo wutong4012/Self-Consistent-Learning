@@ -12,6 +12,9 @@ class Discriminator(nn.Module):
 
         self.dis = BertForSequenceClassification.from_pretrained(
             config.discriminator, num_labels=2)
+        
+        if config.pretrain_dis:
+            return
 
         if config.cycle == 0 or config.cycle == -1:
             pt_path = config.dis_model_path

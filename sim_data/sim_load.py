@@ -7,35 +7,35 @@ from concurrent.futures import ProcessPoolExecutor
 _JSON_DATA_PATH = '/cognitive_comp/wutong/source/data_base/similarity_data/sim_json_data'
 _CACHE_DATA_PATH = '/cognitive_comp/wutong/source/data_base/similarity_data/sim_cache_data'
 _HUGGINGFACE_CACHE = '/cognitive_comp/wutong/source/data_base/huggingface-cache/'
-_WUDAO_DATA_PATH = '/cognitive_comp/wutong/source/data_base/wudao_sentences/'
+# _WUDAO_DATA_PATH = '/cognitive_comp/wutong/source/data_base/wudao_sentences/'
 
 
-def load_wudao_data():
-    cache_dict_paths = glob.glob(os.path.join(_WUDAO_DATA_PATH, '*'))
-    wudao_ds, res, wudao_sentences = [], [], []
-    p = ProcessPoolExecutor(max_workers=1)
+# def load_wudao_data():
+#     cache_dict_paths = glob.glob(os.path.join(_WUDAO_DATA_PATH, '*'))
+#     wudao_ds, res, wudao_sentences = [], [], []
+#     p = ProcessPoolExecutor(max_workers=1)
     
-    for path in cache_dict_paths:
-        res.append(p.submit(datasets.load_from_disk, path))
-    p.shutdown(wait=True)
-    for future in res:
-        wudao_ds.append(future.result())
-    wudao_ds = datasets.concatenate_datasets(wudao_ds)
+#     for path in cache_dict_paths:
+#         res.append(p.submit(datasets.load_from_disk, path))
+#     p.shutdown(wait=True)
+#     for future in res:
+#         wudao_ds.append(future.result())
+#     wudao_ds = datasets.concatenate_datasets(wudao_ds)
     
-    for idx in tqdm.tqdm(range(wudao_ds.num_rows), desc="Concat_Data"):
-        if wudao_ds[idx]['sentence_list'] is not None and wudao_ds[idx]['sentence_list'] != []:
-            wudao_sentences.extend(wudao_ds[idx]['sentence_list'])
+#     for idx in tqdm.tqdm(range(wudao_ds.num_rows), desc="Concat_Data"):
+#         if wudao_ds[idx]['sentence_list'] is not None and wudao_ds[idx]['sentence_list'] != []:
+#             wudao_sentences.extend(wudao_ds[idx]['sentence_list'])
     
-    print(f'There ara total {len(wudao_sentences)} sentences !')
-    random_list = random.sample(range(len(wudao_sentences)), 10)
-    for i in random_list:
-        print("Examples: {}".format(wudao_sentences[i]))
+#     print(f'There ara total {len(wudao_sentences)} sentences !')
+#     random_list = random.sample(range(len(wudao_sentences)), 10)
+#     for i in random_list:
+#         print("Examples: {}".format(wudao_sentences[i]))
     
-    return wudao_sentences
+#     return wudao_sentences
 
 
 class SimPairReader():
-    def __init__(self, wudao_sentences):
+    def __init__(self, wudao_sentences=None):
         path = self.PATH
         data_list = []
         csv.field_size_limit(10000000)
@@ -45,22 +45,26 @@ class SimPairReader():
             progress_bar = tqdm.tqdm()
             while True:
                 progress_bar.update()
-                neg_sent1 = wudao_sentences[self.ids0]
-                neg_sent2 = wudao_sentences[self.ids1]
-                self.ids0 += 2
-                self.ids1 += 2
+                # neg_sent1 = wudao_sentences[self.ids0]
+                # neg_sent2 = wudao_sentences[self.ids1]
+                # self.ids0 += 2
+                # self.ids1 += 2
                 try:
                     line = next(reader)
                     if '\n' in line[0]:  # 单行含有N个样本
                         lines = ''.join(line).split('\n')
                         for line in lines:
-                            dict_data = self.process_line(line, neg_sent1, neg_sent2)  # list
+                            dict_data = self.process_line(line, 
+                                                          neg_sent1=None, 
+                                                          neg_sent2=None)  # list
                             if dict_data is not None:
                                 data_list.extend(dict_data)
                         continue
                 except StopIteration:
                     break
-                dict_data = self.process_line(line, neg_sent1, neg_sent2)
+                dict_data = self.process_line(line, 
+                                              neg_sent1=None, 
+                                              neg_sent2=None)
                 if dict_data is not None:
                     data_list.extend(dict_data)
             print('end of reading {}'.format(path))
@@ -81,7 +85,7 @@ class SimPairReader():
         return ''.join(data).split('\t')
 
     @classmethod
-    def process_line(cls, data, neg_sent1, neg_sent2):
+    def process_line(cls, data, neg_sent1=None, neg_sent2=None):
         # data, list, only one element ['a \t b \t label']
         split_str = cls.split(data)
         text_a = split_str[0]
@@ -96,16 +100,22 @@ class SimPairReader():
         else:
             is_sim = cls.is_sim(split_str[2])  # bool
         
-        if is_sim:
+        dict_data = None
+        if is_sim is True:
             dict_data = (
                 {'text1': text_a, 'text2': text_b, 'score': 1},
                 {'text1': text_b, 'text2': text_a, 'score': 1},
-                {'text1': text_a, 'text2': neg_sent1, 'score': 0},
-                {'text1': text_b, 'text2': neg_sent2, 'score': 0},
+                # {'text1': text_a, 'text2': neg_sent1, 'score': 0},
+                # {'text1': text_b, 'text2': neg_sent2, 'score': 0},
             )
-            return dict_data
+
+        elif is_sim is False:
+            dict_data = (
+                {'text1': text_a, 'text2': text_b, 'score': 0},
+                {'text1': text_b, 'text2': text_a, 'score': 0},
+            )
         
-        return None
+        return dict_data
 
 
 class atec(SimPairReader):
@@ -216,6 +226,15 @@ if __name__ == '__main__':
     #     "pawsx": pawsx(wudao_sentences),
     #     "sts_b": sts_b(wudao_sentences),
     # }
+    named_corpora = {
+        'atec': atec(),
+        'atec_ccks': atec_ccks(),
+        "bq": bq(),
+        "ccks2018": ccks2018(),
+        "lcqmc": lcqmc(),
+        "pawsx": pawsx(),
+        "sts_b": sts_b(),
+    }
 
     print('Starting Save to Cache...')
     generate_cache_arrow()

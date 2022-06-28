@@ -1,3 +1,4 @@
+import gc
 import hydra
 
 import torch
@@ -7,20 +8,15 @@ from pytorch_lightning.callbacks import (LearningRateMonitor, ModelCheckpoint,
                                          EarlyStopping)
 
 from system.gen_system import GenSystem
-from system.dis_system import DisSystem            
+from system.dis_system import DisSystem      
+from data_utlis.predict_dataset import gen_postprocess, dis_postprocess      
             
 
-def set_trainer(config, ckpt_callback, early_stopping, attri):
+def set_trainer(config, ckpt_callback, early_stopping):
     lr_callback = LearningRateMonitor(logging_interval='step')
-    # if attri == 'dis':
-    max_epochs = 20
-    callbacks = [lr_callback, ckpt_callback, early_stopping]
-    # elif attri == 'gen':
-    #     max_epochs = 1
-    #     callbacks = [lr_callback, ckpt_callback]
     trainer = Trainer(
         default_root_dir=config.exp_dir,
-        gpus=8,
+        gpus=4,
         strategy=DeepSpeedStrategy(
             offload_optimizer=True,
             logging_batch_size_per_gpu=1),
@@ -28,8 +24,8 @@ def set_trainer(config, ckpt_callback, early_stopping, attri):
         log_every_n_steps=1,
         num_sanity_val_steps=0,
         check_val_every_n_epoch=1,
-        callbacks=callbacks,
-        max_epochs=max_epochs,
+        callbacks=[lr_callback, ckpt_callback, early_stopping],
+        max_epochs=20,
     )
 
     return trainer
@@ -45,19 +41,25 @@ def generator_cycle(config, gen_system):
     )
     gen_early_stopping = EarlyStopping(
         monitor='gen_val_loss',
-        patience=1,
+        patience=config.es_patience,
         mode='min'
     )
     gen_trainer = set_trainer(
         config=config, 
         ckpt_callback=gen_ckpt_callback, 
         early_stopping=gen_early_stopping,
-        attri='gen',
     )
 
     torch.cuda.empty_cache()
-    gen_trainer.fit(gen_system)
-    gen_system.generate_samples()
+    if config.cycle == -1:
+        gen_output = gen_trainer.predict(gen_system)
+        print(gen_output.size())
+        gen_postprocess(gen_output, gen_system.gen_tokenizer, config)
+    
+    else:
+        gen_trainer.fit(gen_system)
+        gen_output = gen_trainer.predict(gen_system)
+        gen_postprocess(gen_output, gen_system.gen_tokenizer, config)
 
 
 def discriminator_cycle(config, dis_system):
@@ -70,19 +72,25 @@ def discriminator_cycle(config, dis_system):
     )
     dis_early_stopping = EarlyStopping(
         monitor='dis_f1_score',
-        patience=1,
+        patience=config.es_patience,
         mode='max'
     )
     dis_trainer = set_trainer(
         config=config,
         ckpt_callback=dis_ckpt_callback,
         early_stopping=dis_early_stopping,
-        attri='dis',
     )
     
     torch.cuda.empty_cache()
-    dis_trainer.fit(dis_system)
-    dis_system.judge_similarity()
+    if config.cycle == -1:
+        dis_output = dis_trainer.predict(dis_system)
+        print(dis_output.size())
+        dis_postprocess(dis_output, config)
+    
+    else:
+        dis_trainer.fit(dis_system)
+        dis_output = dis_trainer.predict(dis_system)
+        dis_postprocess(dis_output, config)
 
 
 @hydra.main(config_path='./', config_name='hyper_parameter')
@@ -95,13 +103,11 @@ def run(config):
     dis_system = DisSystem(config)
 
     print('Cycle: {}'.format(config.cycle))
-    if config.cycle == -1:
-        gen_system.generate_samples()
-        dis_system.judge_similarity()
-        return
-    
+
     generator_cycle(config, gen_system)
+    gc.collect()
     discriminator_cycle(config, dis_system)
+    gc.collect()
 
 
 if __name__ == '__main__':

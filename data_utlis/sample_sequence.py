@@ -148,7 +148,10 @@ def sample_sequence_batch(model, context_tokens_tensor, context_length_tensor, m
     output_tokens_lists = [tokens[:tokens.index(
         end_token_id)] if end_token_id in tokens else tokens for tokens in output_tokens_lists]
     ppl_list = [math.exp(i) for i in log_probs_list]
-    return output_tokens_lists, ppl_list
+    return {
+        'ids_list': output_tokens_lists,
+        'ppl_list': ppl_list,
+    }
 
 
 def sample_sequence(model, tokens, attention_mask, do_sampling=True,
