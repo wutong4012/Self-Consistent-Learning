@@ -21,7 +21,7 @@ class DisSystem(LightningModule):
 
     def set_dis_dataset(self):
         self.train_dataset, self.val_dataset = \
-            set_dataset(self.config, use_label=True, use_gen=False,
+            set_dataset(self.config, use_label=True, use_gen=True,
                         attri='dis', rank=self.global_rank)
 
     def _set_tokenizers_and_models(self):

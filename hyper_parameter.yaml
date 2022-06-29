@@ -29,6 +29,7 @@ gen_big_batch_size: 30
 pre_gen_bs: 512
 pre_dis_bs: 1024
 
+confront: True
 pretrain_dis: False
 dis_hidden_size: 1024
 discriminator: 'IDEA-CCNL/Erlangshen-Roberta-330M-Similarity'

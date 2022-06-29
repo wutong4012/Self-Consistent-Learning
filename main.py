@@ -41,7 +41,7 @@ def concat_data(raw_list):  # List[Dict]<-(world_size, batch_num)
                 concate_output[key].extend(batch[key])
     
     return concate_output
-    
+
 
 def generator_cycle(config):
     gen_ckpt_callback = ModelCheckpoint(
@@ -113,7 +113,7 @@ def run(config):
     torch.backends.cudnn.benchmark = True
     seed_everything(config.seed)
     
-    for idx in range(0, config.cycle_num):
+    for idx in range(-1, config.cycle_num):
         config.cycle = idx
         print('**********Cycle: {}**********'.format(config.cycle))
 

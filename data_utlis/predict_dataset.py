@@ -56,9 +56,9 @@ def multiply_pre_score(config, raw_dataset, rank):
     scores = []
     for idx in range(len(multi_logits)):
         if multi_logits[idx] >= config.gen_threshold * (1 / len(multi_logits)):
-            scores.append(1)
-        else:
             scores.append(0)
+        else:
+            scores.append(1)
     if rank == 0:
         print(f'**********There are {scores.count(1)} Samples to be selected!**********')
 

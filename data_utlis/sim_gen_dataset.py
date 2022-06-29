@@ -130,7 +130,7 @@ def set_dis_dataset(config, rank, start, end,
                     part_labeled_data, generated_data, labeled_data):
     assert part_labeled_data.features.type == generated_data.features.type
 
-    if config.cycle <= config.gen_anti_cyle:
+    if config.confront:
         if rank > 0:
             print(f'Rank {rank} waiting for main process to perform the filtering')
             torch.distributed.barrier()
@@ -218,8 +218,8 @@ def set_dataset(config, use_label, use_gen, attri, rank):
         labeled_data = load_data(config, rank, is_labeled=True)
         generated_data = load_data(config, rank, is_labeled=False, attri=attri)
 
-        start, end = (config.cycle * generated_data.num_rows * 2), (
-            (config.cycle + 1) * generated_data.num_rows * 2)
+        start, end = (config.cycle * generated_data.num_rows), (
+            (config.cycle + 1) * generated_data.num_rows)
         part_labeled_data = labeled_data.select(range(start, end))
 
         if rank == 0:
