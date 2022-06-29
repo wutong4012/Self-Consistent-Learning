@@ -1,4 +1,5 @@
 import os
+import gc
 import random
 
 import torch
@@ -14,7 +15,7 @@ from model_utils.sim_gen_model import Discriminator
 
 feats = datasets.Features({"text1": datasets.Value('string'),
                            "text2": datasets.Value('string'),
-                           "scores": datasets.Value('int8')})
+                           "score": datasets.Value('int8')})
 
 
 def multiply_pre_score(config, raw_dataset, rank):
@@ -26,7 +27,7 @@ def multiply_pre_score(config, raw_dataset, rank):
         return dis_pred_collate(batch_data, dis_tokenizer)
     dataloader = DataLoader(
         dataset=predict_dataset,
-        batch_size=1024,
+        batch_size=128,
         shuffle=False,
         num_workers=8,
         pin_memory=True,
@@ -54,7 +55,7 @@ def multiply_pre_score(config, raw_dataset, rank):
     
     scores = []
     for idx in range(len(multi_logits)):
-        if multi_logits[idx] > config.gen_threshold * (1 / len(multi_logits)):
+        if multi_logits[idx] >= config.gen_threshold * (1 / len(multi_logits)):
             scores.append(1)
         else:
             scores.append(0)
@@ -64,11 +65,14 @@ def multiply_pre_score(config, raw_dataset, rank):
     return {
         'text1': raw_dataset['text1'],
         'text2': raw_dataset['text2'],
-        'scores': scores,
+        'score': scores,
     }
 
 
 def gen_postprocess(output_dict, gen_tokenizer, config, rank):
+    gc.collect()
+    torch.cuda.empty_cache()
+    
     if rank == 0:
         print('**********Start to Post Process the Generated Data**********')
     sim_sentence = gen_tokenizer.batch_decode(
@@ -105,6 +109,9 @@ def gen_postprocess(output_dict, gen_tokenizer, config, rank):
 
 
 def dis_postprocess(dis_output_dict, config, rank):
+    gc.collect()
+    torch.cuda.empty_cache()
+    
     if rank == 0:
         print('**********Start to Post Process the Scored Data**********')
     text1, text2, scores = [], [], []
@@ -122,7 +129,7 @@ def dis_postprocess(dis_output_dict, config, rank):
     dis_dataset = Dataset.from_dict({
         'text1': text1,
         'text2': text2,
-        'scores': scores,
+        'score': scores,
     }, features=feats)
 
     if rank == 0:
@@ -193,7 +200,6 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
         batch_size = config.pre_gen_bs
 
         wudao_ds = load_data(config, rank, is_wudao=True)
-        wudao_ds = wudao_ds.select(range(80))  # TODO
         predict_dataset = SimGanDataset(wudao_ds)
 
         def collate_fn(batch_data):
@@ -203,7 +209,6 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
         batch_size = config.pre_dis_bs
 
         gen_ds = load_data(config, rank, is_score=True, attri='dis')
-        gen_ds = gen_ds.select(range(50))  # TODO
         predict_dataset = SimGanDataset(gen_ds)
 
         def collate_fn(batch_data):

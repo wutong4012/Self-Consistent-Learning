@@ -18,7 +18,7 @@ def set_trainer(config, ckpt_callback, early_stopping):
     lr_callback = LearningRateMonitor(logging_interval='step')
     trainer = Trainer(
         default_root_dir=config.exp_dir,
-        gpus=4,
+        gpus=8,
         strategy=DeepSpeedStrategy(
             offload_optimizer=True,
             logging_batch_size_per_gpu=1),
@@ -43,7 +43,7 @@ def concat_data(raw_list):  # List[Dict]<-(world_size, batch_num)
     return concate_output
     
 
-def generator_cycle(config, gen_system):
+def generator_cycle(config):
     gen_ckpt_callback = ModelCheckpoint(
         save_top_k=1,
         monitor='gen_val_loss',
@@ -61,6 +61,7 @@ def generator_cycle(config, gen_system):
         ckpt_callback=gen_ckpt_callback, 
         early_stopping=gen_early_stopping,
     )
+    gen_system = GenSystem(config)
 
     torch.cuda.empty_cache()
     if config.cycle == -1:
@@ -75,7 +76,7 @@ def generator_cycle(config, gen_system):
                         config, gen_system.global_rank)
 
 
-def discriminator_cycle(config, dis_system):
+def discriminator_cycle(config):
     dis_ckpt_callback = ModelCheckpoint(
         save_top_k=1,
         monitor='dis_f1_score',
@@ -93,6 +94,7 @@ def discriminator_cycle(config, dis_system):
         ckpt_callback=dis_ckpt_callback,
         early_stopping=dis_early_stopping,
     )
+    dis_system = DisSystem(config)
     
     torch.cuda.empty_cache()
     if config.cycle == -1:
@@ -111,15 +113,14 @@ def run(config):
     torch.backends.cudnn.benchmark = True
     seed_everything(config.seed)
     
-    gen_system = GenSystem(config)
-    dis_system = DisSystem(config)
+    for idx in range(0, config.cycle_num):
+        config.cycle = idx
+        print('**********Cycle: {}**********'.format(config.cycle))
 
-    print('Cycle: {}'.format(config.cycle))
-
-    generator_cycle(config, gen_system)
-    gc.collect()
-    discriminator_cycle(config, dis_system)
-    gc.collect()
+        generator_cycle(config)
+        gc.collect()
+        discriminator_cycle(config)
+        gc.collect()
 
 
 if __name__ == '__main__':

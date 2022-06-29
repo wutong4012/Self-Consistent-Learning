@@ -23,10 +23,10 @@ dis_threshold: 0.9  # Discriminator选择为0/1的阈值
 gen_anti_cyle: -10  #  刚开始先对抗的轮数
 gen_repeat_times: 2  # 每条句子重复生成的次数
 
-dis_batch_size: 32  # 32 / 128
+dis_batch_size: 128  # 32 / 128
 gen_batch_size: 2
 gen_big_batch_size: 30
-pre_gen_bs: 256
+pre_gen_bs: 512
 pre_dis_bs: 1024
 
 pretrain_dis: False
@@ -34,7 +34,10 @@ dis_hidden_size: 1024
 discriminator: 'IDEA-CCNL/Erlangshen-Roberta-330M-Similarity'
 
 learning_rate: 2e-5
-gen_train_steps: 100
+cycle_num: 15
+cycle: -1
+
+gen_train_steps: 200
 dis_train_steps: 200
 warmup_steps: 20
 checkpoint_steps: 10

@@ -2,9 +2,11 @@
 
 # -N 1 --gres=gpu:1 --ntasks-per-node=1 --cpus-per-task=30 -x 
 
-for cycle in {-1..10}
-do
-        echo "RUN cycle $cycle"
-        srun -o ./job_out/%x-%j-$cycle.log -e ./job_out/%x-%j-$cycle.err python main.py +cycle=$cycle
-        echo "END cycle $cycle"
-done
+# for cycle in {-1..10}
+# do
+#         echo "RUN cycle $cycle"
+#         srun -o ./job_out/%x-%j-$cycle.log -e ./job_out/%x-%j-$cycle.err python main.py +cycle=$cycle
+#         echo "END cycle $cycle"
+# done
+
+srun -o ./job_out/%x-%j.log -e ./job_out/%x-%j.err python main.py

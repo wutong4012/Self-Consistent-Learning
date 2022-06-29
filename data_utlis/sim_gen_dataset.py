@@ -80,6 +80,8 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
 
     if rank == 0 and config.cycle != -1:
         torch.distributed.barrier()
+    
+    return sim_dataset
 
 
 def load_data(config, rank, is_labeled=False, is_wudao=False,
@@ -115,11 +117,11 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
             data_path = config.score_data_path + '_cycle_{}'.format(config.cycle)
 
         if rank == 0:
-            print(f'**********Data Path: {data_path} !**********')
+            print(f'Data Path: {data_path} !')
         sim_dataset = datasets.load_from_disk(data_path)
 
         if attri == 'gen':
-            preprocess_gen_data(config, rank, data_path, sim_dataset)
+            sim_dataset = preprocess_gen_data(config, rank, data_path, sim_dataset)
 
     return sim_dataset
 
@@ -223,10 +225,10 @@ def set_dataset(config, use_label, use_gen, attri, rank):
         if rank == 0:
             random_list = random.sample(range(part_labeled_data.num_rows), 10)
             for i in random_list:
-                print('**********Labeled Examples: {}**********'.format(part_labeled_data[i]))
+                print('Labeled Examples: {}'.format(part_labeled_data[i]))
             random_list = random.sample(range(generated_data.num_rows), 10)
             for i in random_list:
-                print('**********Generated Examples: {}**********'.format(generated_data[i]))
+                print('Generated Examples: {}'.format(generated_data[i]))
 
         if attri == 'dis':
             data = set_dis_dataset(
