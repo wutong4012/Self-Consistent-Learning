@@ -42,25 +42,28 @@ def multiply_pre_score(config, raw_dataset, rank):
                 batch['input_ids'].cuda(), None)
             for idx in range(logits.size(0)):
                 logits = torch.softmax(logits, dim=1)
-                real_logits.append(logits[idx][1].cpu())
+                # real_logits.append(logits[idx][1].cpu())
+                real_logits.append(logits[idx].cpu())
     discriminator.to('cpu')
-    logits_list = torch.softmax(
-        torch.tensor(real_logits), dim=0).numpy().tolist()
+    # logits_list = torch.softmax(
+    #     torch.tensor(real_logits), dim=0).numpy().tolist()
 
-    multi_logits = []
-    for idx in range(raw_dataset.num_rows):
-        multi_logits.append(logits_list[idx] * raw_dataset[idx]['-ppl'])
-    multi_logits = torch.softmax(
-        torch.tensor(multi_logits), dim=0).numpy().tolist()
+    # multi_logits = []
+    # for idx in range(raw_dataset.num_rows):
+    #     multi_logits.append(logits_list[idx] * raw_dataset[idx]['-ppl'])
+    # multi_logits = torch.softmax(
+    #     torch.tensor(multi_logits), dim=0).numpy().tolist()
     
     scores = []
-    for idx in range(len(multi_logits)):
-        if multi_logits[idx] >= config.gen_threshold * (1 / len(multi_logits)):
+    # for idx in range(len(multi_logits)):
+    #     if multi_logits[idx] >= config.gen_threshold * (1 / len(multi_logits)):
+    for idx in range(len(real_logits)):
+        if real_logits[idx][0] > config.gen_threshold:
             scores.append(0)
         else:
             scores.append(1)
     if rank == 0:
-        print(f'**********There are {scores.count(1)} Samples to be selected!**********')
+        print(f'**********There are {scores.count(0)} Samples to be Selected 0!**********')
 
     return {
         'text1': raw_dataset['text1'],
