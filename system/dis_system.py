@@ -31,19 +31,19 @@ class DisSystem(LightningModule):
 
     def train_dataloader(self):
         if self.global_rank == 0:
-            print('Start to Prepare the Train Dataloader...')
+            print('**********Start to Prepare the Train Dataloader**********')
         return create_dataloader(config=self.config, dataset=self.train_dataset,
                                  tokenizer=self.dis_tokenizer, attri='dis', shuffle=True)
 
     def val_dataloader(self):
         if self.global_rank == 0:
-            print('Start to Prepare the Validation Dataloader...')
+            print('**********Start to Prepare the Validation Dataloader**********')
         return create_dataloader(config=self.config, dataset=self.val_dataset,
                                  tokenizer=self.dis_tokenizer, attri='dis', shuffle=False)
     
     def predict_dataloader(self):
         if self.global_rank == 0:
-            print('Start to Prepare the Predict Dataloader...')
+            print('**********Start to Prepare the Predict Dataloader**********')
         return create_predict_dataloader(config=self.config, tokenizer=self.dis_tokenizer,
                                          rank=self.global_rank, attri='dis')
 

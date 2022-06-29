@@ -36,7 +36,6 @@ def set_trainer(config, ckpt_callback, early_stopping):
 def concat_data(raw_list):  # List[Dict]<-(world_size, batch_num)
     concate_output = defaultdict(list)
     for item_list in raw_list:
-        print(len(item_list))
         for batch in item_list:
             for key in batch.keys():
                 concate_output[key].extend(batch[key])
@@ -66,12 +65,14 @@ def generator_cycle(config, gen_system):
     torch.cuda.empty_cache()
     if config.cycle == -1:
         gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
-        gen_postprocess(gen_output, gen_system.gen_tokenizer, config)
+        gen_postprocess(gen_output, gen_system.gen_tokenizer, 
+                        config, gen_system.global_rank)
     
     else:
         gen_trainer.fit(gen_system)
         gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
-        gen_postprocess(gen_output, gen_system.gen_tokenizer, config)
+        gen_postprocess(gen_output, gen_system.gen_tokenizer, 
+                        config, gen_system.global_rank)
 
 
 def discriminator_cycle(config, dis_system):
@@ -96,12 +97,12 @@ def discriminator_cycle(config, dis_system):
     torch.cuda.empty_cache()
     if config.cycle == -1:
         dis_output = concat_data(all_gather(dis_trainer.predict(dis_system)))
-        dis_postprocess(dis_output, config)
+        dis_postprocess(dis_output, config, dis_system.global_rank)
     
     else:
         dis_trainer.fit(dis_system)
         dis_output = concat_data(all_gather(dis_trainer.predict(dis_system)))
-        dis_postprocess(dis_output, config)
+        dis_postprocess(dis_output, config, dis_system.global_rank)
 
 
 @hydra.main(config_path='./', config_name='hyper_parameter')

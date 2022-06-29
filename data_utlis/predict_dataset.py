@@ -17,15 +17,15 @@ feats = datasets.Features({"text1": datasets.Value('string'),
                            "scores": datasets.Value('int8')})
 
 
-def multiply_pre_score(config, raw_dataset):
+def multiply_pre_score(config, raw_dataset, rank):
     dis_tokenizer = BertTokenizer.from_pretrained(config.discriminator)
     discriminator = Discriminator(config).cuda().eval()
-    raw_dataset = SimGanDataset(raw_dataset)
+    predict_dataset = SimGanDataset(raw_dataset)
 
     def collate_fn(batch_data):
         return dis_pred_collate(batch_data, dis_tokenizer)
     dataloader = DataLoader(
-        dataset=raw_dataset,
+        dataset=predict_dataset,
         batch_size=1024,
         shuffle=False,
         num_workers=8,
@@ -38,24 +38,28 @@ def multiply_pre_score(config, raw_dataset):
         for batch in dataloader:
             torch.cuda.empty_cache()
             logits = discriminator.forward(
-                batch['input_ids'].cuda(),
-                None)
-            real_logits.append(logits[1].item())
+                batch['input_ids'].cuda(), None)
+            for idx in range(logits.size(0)):
+                logits = torch.softmax(logits, dim=1)
+                real_logits.append(logits[idx][1].cpu())
     discriminator.to('cpu')
-    logits_list = torch.softmax(torch.tensor(real_logits)).numpy().tolist()
+    logits_list = torch.softmax(
+        torch.tensor(real_logits), dim=0).numpy().tolist()
 
     multi_logits = []
     for idx in range(raw_dataset.num_rows):
         multi_logits.append(logits_list[idx] * raw_dataset[idx]['-ppl'])
-    multi_logits = torch.softmax(torch.tensor(multi_logits)).numpy().tolist()
-
+    multi_logits = torch.softmax(
+        torch.tensor(multi_logits), dim=0).numpy().tolist()
+    
     scores = []
     for idx in range(len(multi_logits)):
-        if multi_logits[idx] >= config.gen_threshold:
+        if multi_logits[idx] > config.gen_threshold * (1 / len(multi_logits)):
             scores.append(1)
         else:
             scores.append(0)
-    print(f'There are {scores.count(1)} Samples to be selected!')
+    if rank == 0:
+        print(f'**********There are {scores.count(1)} Samples to be selected!**********')
 
     return {
         'text1': raw_dataset['text1'],
@@ -64,7 +68,9 @@ def multiply_pre_score(config, raw_dataset):
     }
 
 
-def gen_postprocess(output_dict, gen_tokenizer, config):
+def gen_postprocess(output_dict, gen_tokenizer, config, rank):
+    if rank == 0:
+        print('**********Start to Post Process the Generated Data**********')
     sim_sentence = gen_tokenizer.batch_decode(
         output_dict['ids_list'], skip_special_tokens=True)
 
@@ -79,43 +85,53 @@ def gen_postprocess(output_dict, gen_tokenizer, config):
         sim_text.append(item[1][:-1])
         real_ppl_list.append(-output_dict['ppl_list'][idx])  # 加上负号，使其越大越好
 
-    ppl_list = torch.softmax(torch.tensor(real_ppl_list)).numpy().tolist()
+    ppl_list = torch.softmax(
+        torch.tensor(real_ppl_list), dim=0).numpy().tolist()
     raw_dataset = Dataset.from_dict({
         'text1': raw_text,
         'text2': sim_text,
         '-ppl': ppl_list,
     })
-    gen_ds_dict = multiply_pre_score(config, raw_dataset)
+    gen_ds_dict = multiply_pre_score(config, raw_dataset, rank)
     gen_dataset = Dataset.from_dict(gen_ds_dict, features=feats)
 
-    new_data_path = config.gen_data_path + f'_cycle_{config.cycle + 1}'
-    if not os.path.exists(new_data_path):
-        os.makedirs(new_data_path)
-    print(f'Generate Data Samples is {gen_dataset.num_rows}')
-    gen_dataset.save_to_disk(new_data_path)
-    print('Gen Data: done!!!')
+    if rank == 0:
+        new_data_path = config.gen_data_path + f'_cycle_{config.cycle + 1}'
+        if not os.path.exists(new_data_path):
+            os.makedirs(new_data_path)
+        print(f'**********Generate Data Samples is {gen_dataset.num_rows}**********')
+        gen_dataset.save_to_disk(new_data_path)
+        print('**********Gen Data: done!!!**********')
 
 
-def dis_postprocess(dis_output_dict, config):
-    scores = []
-    for item in dis_output_dict['logits']:
+def dis_postprocess(dis_output_dict, config, rank):
+    if rank == 0:
+        print('**********Start to Post Process the Scored Data**********')
+    text1, text2, scores = [], [], []
+    for idx, item in enumerate(dis_output_dict['logits']):
         if item[1] >= config.dis_threshold:
             scores.append(1)
+            text1.append(dis_output_dict['text1'][idx])
+            text2.append(dis_output_dict['text2'][idx])
+
         elif item[0] >= config.dis_threshold:
             scores.append(0)
+            text1.append(dis_output_dict['text1'][idx])
+            text2.append(dis_output_dict['text2'][idx])
 
     dis_dataset = Dataset.from_dict({
-        'text1': dis_output_dict['text1'],
-        'text2': dis_output_dict['text2'],
+        'text1': text1,
+        'text2': text2,
         'scores': scores,
     }, features=feats)
 
-    new_data_path = config.score_data_path + f'_cycle_{config.cycle + 1}'
-    if not os.path.exists(new_data_path):
-        os.makedirs(new_data_path)
-    print(f'Score Data Samples is {dis_dataset.num_rows}')
-    dis_dataset.save_to_disk(new_data_path)
-    print('Score Data: done!!!')
+    if rank == 0:
+        new_data_path = config.score_data_path + f'_cycle_{config.cycle + 1}'
+        if not os.path.exists(new_data_path):
+            os.makedirs(new_data_path)
+        print(f'**********Score Data Samples is {dis_dataset.num_rows}**********')
+        dis_dataset.save_to_disk(new_data_path)
+        print('**********Score Data: done!!!**********')
 
 
 def gen_pred_collate(batch_data, gen_tokenizer, config):
@@ -187,7 +203,7 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
         batch_size = config.pre_dis_bs
 
         gen_ds = load_data(config, rank, is_score=True, attri='dis')
-        gen_ds = gen_ds.select(range(80))  # TODO
+        gen_ds = gen_ds.select(range(50))  # TODO
         predict_dataset = SimGanDataset(gen_ds)
 
         def collate_fn(batch_data):

@@ -67,16 +67,16 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
     if rank == 0:
         cnt = sim_dataset.filter(lambda example: example['score'] == -1,
                                  cache_file_name=data_path+'/short_cache').num_rows
-        print(f'There are {cnt} Short(<10) Sentence!')
+        print(f'**********There are {cnt} Short(<10) Sentence!**********')
         cnt = sim_dataset.filter(lambda example: example['score'] == -2,
                                  cache_file_name=data_path+'/long_cache').num_rows
-        print(f'There are {cnt} Long(>100) Sentence!')
+        print(f'**********There are {cnt} Long(>100) Sentence!**********')
         cnt = sim_dataset.filter(lambda example: example['score'] == -3,
                                  cache_file_name=data_path+'/bad_cache').num_rows
-        print(f'There are {cnt} Bad Sentence!')
+        print(f'**********There are {cnt} Bad Sentence!**********')
         cnt = sim_dataset.filter(lambda example: example['score'] == -4,
                                  cache_file_name=data_path+'/equal_cache').num_rows
-        print(f'There are {cnt} Equal Sentence!')
+        print(f'**********There are {cnt} Equal Sentence!**********')
 
     if rank == 0 and config.cycle != -1:
         torch.distributed.barrier()
@@ -115,7 +115,7 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
             data_path = config.score_data_path + '_cycle_{}'.format(config.cycle)
 
         if rank == 0:
-            print(f'Data Path: {data_path} !')
+            print(f'**********Data Path: {data_path} !**********')
         sim_dataset = datasets.load_from_disk(data_path)
 
         if attri == 'gen':
@@ -130,8 +130,7 @@ def set_dis_dataset(config, rank, start, end,
 
     if config.cycle <= config.gen_anti_cyle:
         if rank > 0:
-            print(
-                f'Rank {rank} waiting for main process to perform the filtering')
+            print(f'Rank {rank} waiting for main process to perform the filtering')
             torch.distributed.barrier()
 
         def filter_fn(example, idx):
@@ -149,8 +148,7 @@ def set_dis_dataset(config, rank, start, end,
 
     else:
         if rank > 0:
-            print(
-                f'Rank {rank} waiting for main process to perform the filtering')
+            print(f'Rank {rank} waiting for main process to perform the filtering')
             torch.distributed.barrier()
 
         def filter_fn(example, idx):
@@ -166,16 +164,16 @@ def set_dis_dataset(config, rank, start, end,
             [part_labeled_data, generated_data, negtived_data])
 
     if rank == 0:
-        print('From Generated Data Positive Samples: ', generated_data.filter(
+        print('**********From Generated Data Positive Samples: **********', generated_data.filter(
             lambda example: example['score'] == 1,
             cache_file_name=config.cache_data_path+'/gen_pos_cache_'+str(config.cycle)).num_rows)
-        print('From Generated Data Negtive Samples: ', generated_data.filter(
+        print('**********From Generated Data Negtive Samples: **********', generated_data.filter(
             lambda example: example['score'] == 0,
             cache_file_name=config.cache_data_path+'/gen_neg_cache_'+str(config.cycle)).num_rows)
-        print('All Positive Samples: ', data.filter(
+        print('**********All Positive Samples: **********', data.filter(
             lambda example: example['score'] == 1,
             cache_file_name=config.cache_data_path+'/all_pos_cache_'+str(config.cycle)).num_rows)
-        print('All Negtive Samples: ', data.filter(
+        print('**********All Negtive Samples: **********', data.filter(
             lambda example: example['score'] == 0,
             cache_file_name=config.cache_data_path+'/all_neg_cache_'+str(config.cycle)).num_rows)
 
@@ -201,8 +199,8 @@ def set_gen_dataset(config, rank, part_labeled_data, generated_data):
         [part_labeled_data, generated_data])
 
     if rank == 0:
-        print(f'All Gen-Data Samples is {data.num_rows}')
-        print(f'{generated_data.num_rows} Filter Samples From Generated Data')
+        print(f'**********All Gen-Data Samples is {data.num_rows}**********')
+        print(f'**********{generated_data.num_rows} Filter Samples From Generated Data**********')
 
     return data
 
@@ -225,10 +223,10 @@ def set_dataset(config, use_label, use_gen, attri, rank):
         if rank == 0:
             random_list = random.sample(range(part_labeled_data.num_rows), 10)
             for i in random_list:
-                print('Labeled Examples: {}'.format(part_labeled_data[i]))
+                print('**********Labeled Examples: {}**********'.format(part_labeled_data[i]))
             random_list = random.sample(range(generated_data.num_rows), 10)
             for i in random_list:
-                print('Generated Examples: {}'.format(generated_data[i]))
+                print('**********Generated Examples: {}**********'.format(generated_data[i]))
 
         if attri == 'dis':
             data = set_dis_dataset(
