@@ -1,6 +1,7 @@
 import os
 import gc
 import random
+from tqdm import tqdm
 
 import torch
 import datasets
@@ -21,47 +22,25 @@ feats = datasets.Features({"text1": datasets.Value('string'),
 def multiply_pre_score(config, raw_dataset, rank):
     dis_tokenizer = BertTokenizer.from_pretrained(config.discriminator)
     discriminator = Discriminator(config).cuda().eval()
-    predict_dataset = SimGanDataset(raw_dataset)
-
-    def collate_fn(batch_data):
-        return dis_pred_collate(batch_data, dis_tokenizer)
-    dataloader = DataLoader(
-        dataset=predict_dataset,
-        batch_size=128,
-        shuffle=False,
-        num_workers=8,
-        pin_memory=True,
-        collate_fn=collate_fn,
-    )
 
     with torch.no_grad():
-        real_logits = []
-        for batch in dataloader:
+        text1, text2, scores = [], [], []
+        for idx in tqdm(range(raw_dataset.num_rows)):
             torch.cuda.empty_cache()
-            logits = discriminator.forward(
-                batch['input_ids'].cuda(), None)
-            for idx in range(logits.size(0)):
-                logits = torch.softmax(logits, dim=1)
-                # real_logits.append(logits[idx][1].cpu())
-                real_logits.append(logits[idx].cpu())
-    discriminator.to('cpu')
-    # logits_list = torch.softmax(
-    #     torch.tensor(real_logits), dim=0).numpy().tolist()
+            dis_text = raw_dataset['text1'][idx] + '[SEP]' + raw_dataset['text2'][idx]
+            input_ids = dis_tokenizer(dis_text, return_tensors='pt').input_ids
 
-    # multi_logits = []
-    # for idx in range(raw_dataset.num_rows):
-    #     multi_logits.append(logits_list[idx] * raw_dataset[idx]['-ppl'])
-    # multi_logits = torch.softmax(
-    #     torch.tensor(multi_logits), dim=0).numpy().tolist()
-    
-    scores = []
-    # for idx in range(len(multi_logits)):
-    #     if multi_logits[idx] >= config.gen_threshold * (1 / len(multi_logits)):
-    for idx in range(len(real_logits)):
-        if real_logits[idx][0] >= config.gen_threshold:
-            scores.append(0)
-        else:
-            scores.append(1)
+            logits = discriminator.forward(input_ids.cuda(), None)
+            logits = torch.softmax(logits, dim=1)
+            
+            text1.append(raw_dataset['text1'][idx])
+            text2.append(raw_dataset['text2'][idx])
+            if logits[0][0] >= config.gen_threshold:
+                scores.append(0)
+            else:
+                scores.append(1)
+
+    discriminator.to('cpu')
     if rank == 0:
         print(f'**********There are {scores.count(0)} Samples to be Selected 0!**********')
 

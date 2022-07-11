@@ -9,4 +9,4 @@
 #         echo "END cycle $cycle"
 # done
 
-srun -o ./job_out/%x-%j.log -e ./job_out/%x-%j.err python main.py
+srun --gres=gpu:8 -o ./job_out/%x-%j.log -e ./job_out/%x-%j.err python main.py
