@@ -58,7 +58,7 @@ def multiply_pre_score(config, raw_dataset, rank):
     # for idx in range(len(multi_logits)):
     #     if multi_logits[idx] >= config.gen_threshold * (1 / len(multi_logits)):
     for idx in range(len(real_logits)):
-        if real_logits[idx][0] > config.gen_threshold:
+        if real_logits[idx][0] >= config.gen_threshold:
             scores.append(0)
         else:
             scores.append(1)

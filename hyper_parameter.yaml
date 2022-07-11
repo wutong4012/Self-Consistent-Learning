@@ -18,10 +18,10 @@ cache_data_path: /cognitive_comp/wutong/source/data_base/sim_cycle_cache
 top_k: 0
 top_p: 0.95
 
-gen_threshold: 0.8
+gen_threshold: 0.7  # 上一轮的 D 预测为0的阈值
 dis_threshold: 0.9  # Discriminator选择为0/1的阈值
 gen_anti_cyle: -10  # 刚开始先对抗的轮数
-gen_repeat_times: 5  # 每条句子重复生成的次数
+gen_repeat_times: 3  # 每条句子重复生成的次数
 
 dis_batch_size: 128  # 32 / 128
 gen_batch_size: 2
