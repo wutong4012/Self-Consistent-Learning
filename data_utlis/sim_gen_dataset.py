@@ -99,12 +99,7 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
         return wudao_ds
 
     if is_labeled:
-        cache_dict_paths = glob.glob(config.lab_data_path + '/*')
-
-        sim_ds_list = []
-        for path in cache_dict_paths:
-            sim_ds_list.append(datasets.load_from_disk(path))
-        sim_dataset = datasets.concatenate_datasets(sim_ds_list)
+        sim_dataset = datasets.load_from_disk(config.lab_data_path + '/labeled_data')
 
     else:
         if attri == 'dis':
@@ -232,10 +227,21 @@ def set_dataset(config, use_label, use_gen, attri, rank):
             data = set_gen_dataset(
                 config, rank, part_labeled_data, generated_data)
 
-    train_dataset = SimGanDataset(data=data)
-    test_data = datasets.load_from_disk(config.test_data_path)
-    val_dataset = SimGanDataset(data=test_data)
+    if config.pretrain_dis:
+        train_data = datasets.load_from_disk(config.lab_data_path + '/train_labeled_data')
+        train_dataset = SimGanDataset(data=train_data)
+        test_data = datasets.load_from_disk(config.lab_data_path + '/test_labeled_data')
+        val_dataset = SimGanDataset(data=test_data)
+        
+    else:
+        train_dataset = SimGanDataset(data=data)
+        test_data = datasets.load_from_disk(config.test_data_path)
+        val_dataset = SimGanDataset(data=test_data)
 
+    if rank == 0:
+        print('**********Train Data: ', len(train_dataset))
+        print('**********Test Data: ', len(val_dataset))
+        
     torch.distributed.barrier()
     return train_dataset, val_dataset
 

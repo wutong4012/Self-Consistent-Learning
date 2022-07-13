@@ -26,6 +26,7 @@ def set_trainer(config, ckpt_callback, early_stopping):
         log_every_n_steps=1,
         num_sanity_val_steps=0,
         check_val_every_n_epoch=1,
+        # val_check_interval=100,
         callbacks=[lr_callback, ckpt_callback, early_stopping],
         max_epochs=20,
     )
@@ -103,8 +104,9 @@ def discriminator_cycle(config):
     
     else:
         dis_trainer.fit(dis_system)
-        dis_output = concat_data(all_gather(dis_trainer.predict(dis_system)))
-        dis_postprocess(dis_output, config, dis_system.global_rank)
+        if not config.pretrain_dis:
+            dis_output = concat_data(all_gather(dis_trainer.predict(dis_system)))
+            dis_postprocess(dis_output, config, dis_system.global_rank)
 
 
 @hydra.main(config_path='./', config_name='hyper_parameter')
@@ -113,12 +115,13 @@ def run(config):
     torch.backends.cudnn.benchmark = True
     seed_everything(config.seed)
     
-    for idx in range(-1, config.cycle_num):
+    for idx in range(config.cycle, config.cycle_num):
         config.cycle = idx
         print('**********Cycle: {}**********'.format(config.cycle))
 
-        generator_cycle(config)
-        gc.collect()
+        if not config.pretrain_dis:
+            generator_cycle(config)
+            gc.collect()
         discriminator_cycle(config)
         gc.collect()
 
