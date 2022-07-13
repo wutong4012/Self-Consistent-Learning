@@ -233,7 +233,7 @@ def set_dataset(config, use_label, use_gen, attri, rank):
                 config, rank, part_labeled_data, generated_data)
 
     train_dataset = SimGanDataset(data=data)
-    test_data = datasets.load_from_disk(config.lab_data_path+'/test_data')
+    test_data = datasets.load_from_disk(config.test_data_path)
     val_dataset = SimGanDataset(data=test_data)
 
     torch.distributed.barrier()

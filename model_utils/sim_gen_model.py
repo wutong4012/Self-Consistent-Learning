@@ -18,20 +18,33 @@ class Discriminator(nn.Module):
         if config.pretrain_dis:
             return
 
-        if config.cycle == 0 or config.cycle == -1:
-            pt_path = config.dis_model_path
-        else:
+        # if config.cycle == 0 or config.cycle == -1:
+        #     pt_path = config.dis_model_path
+        # else:
+        #     pt_path = config.ckpt_model_path + \
+        #         f'/discriminator_cycle_{config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt'
+
+        # new_dict = {}
+        # state_dict = torch.load(pt_path, map_location='cpu')['module']
+        # for k, v in state_dict.items():
+        #     if any([i in k for i in ['module.discriminator.dis.']]):
+        #         new_dict[k[len('module.discriminator.dis.'):]] = v
+        #     else:
+        #         continue
+        # self.dis.load_state_dict(new_dict)
+        
+        if config.cycle > 0:
             pt_path = config.ckpt_model_path + \
                 f'/discriminator_cycle_{config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt'
-
-        new_dict = {}
-        state_dict = torch.load(pt_path, map_location='cpu')['module']
-        for k, v in state_dict.items():
-            if any([i in k for i in ['module.discriminator.dis.']]):
-                new_dict[k[len('module.discriminator.dis.'):]] = v
-            else:
-                continue
-        self.dis.load_state_dict(new_dict)
+            new_dict = {}
+            state_dict = torch.load(pt_path, map_location='cpu')['module']
+            for k, v in state_dict.items():
+                if any([i in k for i in ['module.discriminator.dis.']]):
+                    new_dict[k[len('module.discriminator.dis.'):]] = v
+                else:
+                    continue
+            self.dis.load_state_dict(new_dict)
+        
         print(f'Cycle {config.cycle}: The Discriminator Erlangshen Load Successfully !\n')
 
     def forward(self, dis_input_ids, labels):
