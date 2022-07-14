@@ -28,7 +28,7 @@ def set_trainer(config, ckpt_callback, early_stopping):
         check_val_every_n_epoch=1,
         # val_check_interval=100,
         callbacks=[lr_callback, ckpt_callback, early_stopping],
-        max_epochs=20,
+        max_epochs=50,
     )
 
     return trainer

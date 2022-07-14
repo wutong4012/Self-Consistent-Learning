@@ -35,7 +35,11 @@ def multiply_pre_score(config, raw_dataset, rank):
             
             text1.append(raw_dataset['text1'][idx])
             text2.append(raw_dataset['text2'][idx])
-            if logits[0][0] >= config.gen_threshold:
+
+            threshold = config.gen_threshold + (config.cycle + 1) * 0.1
+            if threshold > 0.9:
+                threshold = 0.9
+            if logits[0][0] >= threshold:
                 scores.append(0)
             else:
                 scores.append(1)
