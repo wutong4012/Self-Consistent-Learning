@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from transformers import BertForSequenceClassification
 
+# from model_utils.gpt2_for_inference import GPT2Model
 from model_utils.gpt2_modeling import GPT2Model
 
 

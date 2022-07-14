@@ -8,8 +8,7 @@ def top_k_logits(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')):
     # https://medium.com/huggingface/how-to-build-a-state-of-the-art-conversational-ai-with-transfer-learning-2d818ac26313
     if top_k > 0:
         # Remove all tokens with a probability less than the last token of the top-k
-        indices_to_remove = logits < torch.topk(logits, top_k)[
-            0][..., -1, None]
+        indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
         logits[indices_to_remove] = filter_value
     if top_p > 0.0:
         # convert to 1D
@@ -22,8 +21,7 @@ def top_k_logits(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')):
         # Remove tokens with cumulative probability above the threshold
         sorted_indices_to_remove = cumulative_probs > top_p
         # Shift the indices to the right to keep also the first token above the threshold
-        sorted_indices_to_remove[...,
-                                 1:] = sorted_indices_to_remove[..., :-1].clone()
+        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
         sorted_indices_to_remove[..., 0] = 0
 
         for i in range(sorted_indices.size()[0]):
@@ -106,10 +104,10 @@ def sample_sequence_batch(model, context_tokens_tensor, context_length_tensor, m
             logits = logits[:, -1]
             logits /= temperature
             logits = top_k_logits(logits, top_k=top_k, top_p=top_p)
-            log_probs = F.softmax(logits, dim=-1)  # [bs, vocab_size]
             if repetition_penalty != 1.0:
                 for bz in range(batch_size):
-                    enforce_repetition_penalty(log_probs[bz, :], tokens[bz, :], repetition_penalty)
+                    enforce_repetition_penalty(logits[bz, :], tokens[bz, :], repetition_penalty)
+            log_probs = F.softmax(logits, dim=-1)  # [bs, vocab_size]
 
             prev = torch.multinomial(log_probs, num_samples=1).view(-1)  # [bs]
 

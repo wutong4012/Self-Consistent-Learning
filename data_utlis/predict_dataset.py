@@ -32,25 +32,28 @@ def multiply_pre_score(config, raw_dataset, rank):
 
             logits = discriminator.forward(input_ids.cuda(), None)
             logits = torch.softmax(logits, dim=1)
-            
-            text1.append(raw_dataset['text1'][idx])
-            text2.append(raw_dataset['text2'][idx])
 
-            threshold = config.gen_threshold + (config.cycle + 1) * 0.1
-            if threshold > 0.9:
-                threshold = 0.9
+            threshold = config.gen_threshold - (config.cycle + 1) * 0.1
+            if threshold < 0.6:
+                threshold = 0.6
             if logits[0][0] >= threshold:
                 scores.append(0)
-            else:
+                text1.append(raw_dataset['text1'][idx])
+                text2.append(raw_dataset['text2'][idx])
+            elif logits[0][1] >= threshold:
                 scores.append(1)
+                text1.append(raw_dataset['text1'][idx])
+                text2.append(raw_dataset['text2'][idx])
 
     discriminator.to('cpu')
     if rank == 0:
+        print(f'**********The Threshold is {threshold}**********')
         print(f'**********There are {scores.count(0)} Samples to be Selected 0!**********')
+        print(f'**********There are {scores.count(1)} Samples to be Selected 1!**********')
 
     return {
-        'text1': raw_dataset['text1'],
-        'text2': raw_dataset['text2'],
+        'text1': text1,
+        'text2': text2,
         'score': scores,
     }
 
@@ -136,8 +139,10 @@ def gen_pred_collate(batch_data, gen_tokenizer, config):
 
         # 每段话只随机选一条句子
         random_num = random.sample(range(len(item)), 1)[0]
+        # random_num = 0
         while len(item[random_num]) < 10 or len(item[random_num]) > 100:
             random_num = random.sample(range(len(item)), 1)[0]
+            # random_num += 1
 
         cur_input_ids = gen_tokenizer(
             '<bos>“' + item[random_num] + '”的相似句是“', return_tensors='pt'
