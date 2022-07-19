@@ -68,10 +68,10 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
     if rank == 0:
         cnt = sim_dataset.filter(lambda example: example['score'] == -1,
                                  cache_file_name=data_path+'/short_cache').num_rows
-        print(f'**********There are {cnt} Short(<10) Sentence!**********')
+        print(f'**********There are {cnt} Short(<5) Sentence!**********')
         cnt = sim_dataset.filter(lambda example: example['score'] == -2,
                                  cache_file_name=data_path+'/long_cache').num_rows
-        print(f'**********There are {cnt} Long(>100) Sentence!**********')
+        print(f'**********There are {cnt} Long(>50) Sentence!**********')
         cnt = sim_dataset.filter(lambda example: example['score'] == -3,
                                  cache_file_name=data_path+'/bad_cache').num_rows
         print(f'**********There are {cnt} Bad Sentence!**********')
