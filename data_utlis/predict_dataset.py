@@ -232,16 +232,17 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
             if end == 0:
                 end = test_ds.num_rows
             test_ds = test_ds.select(range(start, end))
+            sentence_ds = datasets.concatenate_datasets([wudao_ds, test_ds])
         
         elif config.use_afqmc:
             test_ds = datasets.load_from_disk(config.test_sentence_path + '/afqmc_sentence')
             start = (config.cycle + 1) * config.afqmc_sentence_num
             end = (config.cycle + 2) * config.afqmc_sentence_num
             test_ds = test_ds.select(range(start, end))
+            sentence_ds = test_ds
             
         if rank == 0:
             print(f'**********The Test_ds Range is {start} ~~ {end}**********')
-        sentence_ds = datasets.concatenate_datasets([wudao_ds, test_ds])
         predict_dataset = SimGanDataset(sentence_ds)
 
         def collate_fn(batch_data):
