@@ -1,5 +1,6 @@
 import glob
 import random
+from regex import F
 
 import torch
 import datasets
@@ -44,9 +45,9 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
         return record[-1][-1]
 
     def process_equal(example):
-        if min(len(example['text1']), len(example['text2'])) < 10:  # 最小长度设为10
+        if min(len(example['text1']), len(example['text2'])) < 5:  # 最小长度设为5
             example['score'] = -1
-        elif max(len(example['text1']), len(example['text2'])) > 100:  # 最大长度设为100
+        elif max(len(example['text1']), len(example['text2'])) > 50:  # 最大长度设为50
             example['score'] = -2
         else:
             delta = min(len(example['text1']), len(
@@ -99,7 +100,17 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
         return wudao_ds
 
     if is_labeled:
-        sim_dataset = datasets.load_from_disk(config.lab_data_path + '/labeled_data')
+        if config.use_bustm:
+            sim_dataset = datasets.load_from_disk(config.lab_data_path + '/labeled_data')
+        elif config.use_afqmc:
+            sim_dataset = datasets.load_from_disk(config.lab_data_path + '/afqmc_labeled_data')
+        if rank > 0:
+            torch.distributed.barrier()
+        sim_dataset = sim_dataset.shuffle(
+            config.seed, 
+            indices_cache_file_name=config.cache_data_path+'/shuffle_cache_'+str(config.cycle))
+        if rank == 0:
+            torch.distributed.barrier()
 
     else:
         if attri == 'dis':
@@ -235,7 +246,10 @@ def set_dataset(config, use_label, use_gen, attri, rank):
         
     else:
         train_dataset = SimGanDataset(data=data)
-        test_data = datasets.load_from_disk(config.test_data_path)
+        if config.use_bustm:
+            test_data = datasets.load_from_disk(config.test_data_path + '/bustm')
+        elif config.use_afqmc:
+            test_data = datasets.load_from_disk(config.test_data_path + '/afqmc')
         val_dataset = SimGanDataset(data=test_data)
 
     if rank == 0:

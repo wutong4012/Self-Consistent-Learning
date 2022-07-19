@@ -21,7 +21,10 @@ class Discriminator(nn.Module):
 
         if config.warm_up_model:
             if config.cycle == 0 or config.cycle == -1:
-                pt_path = config.dis_model_path
+                if config.use_bustm:
+                    pt_path = config.dis_model_path + '/roberta_large.pt'
+                elif config.use_afqmc:
+                    pt_path = config.dis_model_path + '/roberta_large_afqmc.pt'
             else:
                 pt_path = config.ckpt_model_path + \
                     f'/discriminator_cycle_{config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt'
@@ -34,6 +37,7 @@ class Discriminator(nn.Module):
                 else:
                     continue
             self.dis.load_state_dict(new_dict)
+            
         
         else:
             if config.cycle > 0:
@@ -48,7 +52,7 @@ class Discriminator(nn.Module):
                         continue
                 self.dis.load_state_dict(new_dict)
         
-        print(f'Cycle {config.cycle}: The Discriminator Erlangshen Load Successfully !\n')
+        print(f'Cycle {config.cycle}: The Discriminator Load Successfully !\n')
 
     def forward(self, dis_input_ids, labels):
         attention_mask = (dis_input_ids > 0).int()

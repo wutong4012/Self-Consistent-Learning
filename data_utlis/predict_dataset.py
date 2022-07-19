@@ -1,7 +1,6 @@
 import os
 import gc
 import random
-from tqdm import tqdm
 
 import torch
 import datasets
@@ -22,33 +21,48 @@ feats = datasets.Features({"text1": datasets.Value('string'),
 def multiply_pre_score(config, raw_dataset, rank):
     dis_tokenizer = BertTokenizer.from_pretrained(config.discriminator)
     discriminator = Discriminator(config).cuda().eval()
-
+    
+    predict_dataset = SimGanDataset(raw_dataset)
+    def collate_fn(batch_data):
+        return dis_pred_collate(batch_data, dis_tokenizer)
+    dataloader = DataLoader(
+        dataset=predict_dataset,
+        batch_size=128,
+        shuffle=False,
+        num_workers=8,
+        pin_memory=True,
+        collate_fn=collate_fn,
+    )
+    
     with torch.no_grad():
-        text1, text2, scores = [], [], []
-        for idx in tqdm(range(raw_dataset.num_rows)):
+        all_logits, text1, text2, scores = [], [], [], []
+        for batch in dataloader:
             torch.cuda.empty_cache()
-            dis_text = raw_dataset['text1'][idx] + '[SEP]' + raw_dataset['text2'][idx]
-            input_ids = dis_tokenizer(dis_text, return_tensors='pt').input_ids
+            logits = discriminator.forward(
+                batch['input_ids'].cuda(), None)
+            all_logits.append(torch.softmax(logits, dim=1))
 
-            logits = discriminator.forward(input_ids.cuda(), None)
-            logits = torch.softmax(logits, dim=1)
-
-            threshold = config.gen_threshold - (config.cycle + 1) * 0.1
-            if threshold < 0.6:
-                threshold = 0.6
-            if logits[0][0] >= threshold:
+        threshold0 = config.gen_threshold0  # - (config.cycle + 1) * 0.04
+        threshold1 = config.gen_threshold1  # - (config.cycle + 1) * 0.03
+        all_logits = torch.cat(all_logits, dim=0)
+        assert all_logits.size(0) == raw_dataset.num_rows
+        
+        for idx in range(raw_dataset.num_rows):
+            if all_logits[idx][0] >= threshold0:
                 scores.append(0)
                 text1.append(raw_dataset['text1'][idx])
                 text2.append(raw_dataset['text2'][idx])
-            elif logits[0][1] >= threshold:
+            elif all_logits[idx][1] >= threshold1:
                 scores.append(1)
                 text1.append(raw_dataset['text1'][idx])
                 text2.append(raw_dataset['text2'][idx])
 
     discriminator.to('cpu')
     if rank == 0:
-        print(f'**********The Threshold is {threshold}**********')
+        print(f'**********Origin Generate Data Samples is {raw_dataset.num_rows}**********')
+        print(f'**********The Threshold 0 is {threshold0}**********')
         print(f'**********There are {scores.count(0)} Samples to be Selected 0!**********')
+        print(f'**********The Threshold 1 is {threshold1}**********')
         print(f'**********There are {scores.count(1)} Samples to be Selected 1!**********')
 
     return {
@@ -110,7 +124,7 @@ def dis_postprocess(dis_output_dict, config, rank):
             text1.append(dis_output_dict['text1'][idx])
             text2.append(dis_output_dict['text2'][idx])
 
-        elif item[0] >= config.dis_threshold:
+        else:
             scores.append(0)
             text1.append(dis_output_dict['text1'][idx])
             text2.append(dis_output_dict['text2'][idx])
@@ -137,12 +151,25 @@ def gen_pred_collate(batch_data, gen_tokenizer, config):
         if item is None or item == []:
             continue
 
-        # 每段话只随机选一条句子
-        random_num = random.sample(range(len(item)), 1)[0]
-        # random_num = 0
-        while len(item[random_num]) < 10 or len(item[random_num]) > 100:
+        # wudao_ds 每段话只随机选一条句子
+        if len(item) > 1:
+            flag = 1
             random_num = random.sample(range(len(item)), 1)[0]
-            # random_num += 1
+            for idx in range(0, len(item)):
+                if len(item[idx]) < 5 or len(item[idx]) > 50:
+                    continue
+                else:
+                    random_num = idx
+                    flag = 0
+                    break
+            if flag:
+                continue
+        # test_ds 列表里只有一句话
+        elif len(item) == 1:
+            if config.use_afqmc:
+                if len(item[0]) < 5 or len(item[0]) > 50:
+                    continue
+            random_num = 0
 
         cur_input_ids = gen_tokenizer(
             '<bos>“' + item[random_num] + '”的相似句是“', return_tensors='pt'
@@ -190,8 +217,32 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
     if attri == 'gen':
         batch_size = config.pre_gen_bs
 
-        wudao_ds = load_data(config, rank, is_wudao=True)
-        predict_dataset = SimGanDataset(wudao_ds)
+        if config.use_bustm:
+            wudao_ds = load_data(config, rank, is_wudao=True)
+            test_ds = datasets.load_from_disk(config.test_sentence_path + '/bustm_sentence')
+            if rank > 0:
+                torch.distributed.barrier()
+            test_ds = test_ds.shuffle(
+                config.seed + config.cycle, 
+                indices_cache_file_name=config.cache_data_path+'/test_shuffle_cache_'+str(config.cycle))
+            if rank == 0:
+                torch.distributed.barrier()
+            start = (config.cycle + 1) * config.bustm_sentence_num % 8000
+            end = (config.cycle + 2) * config.bustm_sentence_num % 8000
+            if end == 0:
+                end = test_ds.num_rows
+            test_ds = test_ds.select(range(start, end))
+        
+        elif config.use_afqmc:
+            test_ds = datasets.load_from_disk(config.test_sentence_path + '/afqmc_sentence')
+            start = (config.cycle + 1) * config.afqmc_sentence_num
+            end = (config.cycle + 2) * config.afqmc_sentence_num
+            test_ds = test_ds.select(range(start, end))
+            
+        if rank == 0:
+            print(f'**********The Test_ds Range is {start} ~~ {end}**********')
+        sentence_ds = datasets.concatenate_datasets([wudao_ds, test_ds])
+        predict_dataset = SimGanDataset(sentence_ds)
 
         def collate_fn(batch_data):
             return gen_pred_collate(batch_data, tokenizer, config)

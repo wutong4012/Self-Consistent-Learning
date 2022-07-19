@@ -45,8 +45,14 @@ class GenSystem(LightningModule):
                                  tokenizer=self.gen_tokenizer, attri='gen', shuffle=False)
 
     def predict_dataloader(self):
+        if self.config.top_p > 0.1:
+            self.config.top_p -= 0.1
+        if self.config.repetition_penalty < 1.5:
+            self.config.repetition_penalty += 0.1
         if self.global_rank == 0:
             print('**********Start to Prepare the Predict Dataloader**********')
+            print(f'**********The Top-P is {self.config.top_p}**********')
+            print(f'**********The Repetition Penalty is {self.config.repetition_penalty}**********')
         return create_predict_dataloader(config=self.config, tokenizer=self.gen_tokenizer,
                                          rank=self.global_rank, attri='gen')
 
@@ -103,8 +109,8 @@ class GenSystem(LightningModule):
         self.generator.gen.to('cuda').eval()
         output_dict = sample_sequence_batch(
             model=self.generator.gen, context_tokens_tensor=batch['input_ids'].cuda(),
-            context_length_tensor=batch['length_tensor'], repetition_penalty=1.5, max_out_seq=200,
-            end_token_id=50000, temperature=1.0, top_k=self.config.top_k, top_p=self.config.top_p,
+            context_length_tensor=batch['length_tensor'], repetition_penalty=self.config.repetition_penalty,
+            max_out_seq=200, end_token_id=50000, temperature=1.0, top_k=self.config.top_k, top_p=self.config.top_p,
         )
 
         return output_dict
