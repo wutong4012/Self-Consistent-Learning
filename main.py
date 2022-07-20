@@ -65,27 +65,18 @@ def generator_cycle(config):
     gen_system = GenSystem(config)
 
     torch.cuda.empty_cache()
-    if config.cycle == -1:
-        for idx in range(2):
-            for_score = False
-            if idx == 1:
-                if gen_system.global_rank == 0:
-                    print('**********Starting Predict Again for Score...**********')
-                for_score = True
-            gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
-            gen_postprocess(gen_output, gen_system.gen_tokenizer, 
-                            config, gen_system.global_rank, for_score=for_score)
-    
-    else:
+    if config.cycle != -1:
         gen_trainer.fit(gen_system)
-        for idx in range(2):
-            if idx == 1:
-                if gen_system.global_rank == 0:
-                    print('**********Starting Predict Again for Score...**********')
-                for_score = True
-            gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
-            gen_postprocess(gen_output, gen_system.gen_tokenizer, 
-                            config, gen_system.global_rank, for_score=for_score)
+
+    for_score = False
+    for idx in range(2):
+        if idx == 1:
+            if gen_system.global_rank == 0:
+                print('**********Starting Predict Again for Score...**********')
+            for_score = True
+        gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
+        gen_postprocess(gen_output, gen_system.gen_tokenizer, 
+                        config, gen_system.global_rank, for_score=for_score)
 
 
 def discriminator_cycle(config):
@@ -109,15 +100,12 @@ def discriminator_cycle(config):
     dis_system = DisSystem(config)
     
     torch.cuda.empty_cache()
-    if config.cycle == -1:
+    if config.cycle != -1:
+        dis_trainer.fit(dis_system)
+
+    if not config.pretrain_dis:
         dis_output = concat_data(all_gather(dis_trainer.predict(dis_system)))
         dis_postprocess(dis_output, config, dis_system.global_rank)
-    
-    else:
-        dis_trainer.fit(dis_system)
-        if not config.pretrain_dis:
-            dis_output = concat_data(all_gather(dis_trainer.predict(dis_system)))
-            dis_postprocess(dis_output, config, dis_system.global_rank)
 
 
 @hydra.main(config_path='./', config_name='hyper_parameter')
