@@ -66,15 +66,26 @@ def generator_cycle(config):
 
     torch.cuda.empty_cache()
     if config.cycle == -1:
-        gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
-        gen_postprocess(gen_output, gen_system.gen_tokenizer, 
-                        config, gen_system.global_rank)
+        for idx in range(2):
+            for_score = False
+            if idx == 1:
+                if gen_system.global_rank == 0:
+                    print('**********Starting Predict Again for Score...**********')
+                for_score = True
+            gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
+            gen_postprocess(gen_output, gen_system.gen_tokenizer, 
+                            config, gen_system.global_rank, for_score=for_score)
     
     else:
         gen_trainer.fit(gen_system)
-        gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
-        gen_postprocess(gen_output, gen_system.gen_tokenizer, 
-                        config, gen_system.global_rank)
+        for idx in range(2):
+            if idx == 1:
+                if gen_system.global_rank == 0:
+                    print('**********Starting Predict Again for Score...**********')
+                for_score = True
+            gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
+            gen_postprocess(gen_output, gen_system.gen_tokenizer, 
+                            config, gen_system.global_rank, for_score=for_score)
 
 
 def discriminator_cycle(config):

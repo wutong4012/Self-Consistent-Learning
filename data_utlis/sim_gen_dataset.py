@@ -90,7 +90,7 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
     if is_wudao:
         cache_dict_paths = glob.glob(config.wudao_data_path + '/*')
         cache_dict_paths = cache_dict_paths[
-            (config.cycle + 1) * 2 : (config.cycle + 2) * 2]
+            config.data_num * 2 : (config.data_num + 1) * 2]
 
         wudao_ds_list = []
         for path in cache_dict_paths:
@@ -107,7 +107,7 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
         if rank > 0:
             torch.distributed.barrier()
         sim_dataset = sim_dataset.shuffle(
-            config.seed, 
+            config.seed + config.cycle, 
             indices_cache_file_name=config.cache_data_path+'/shuffle_cache_'+str(config.cycle))
         if rank == 0:
             torch.distributed.barrier()
@@ -115,12 +115,12 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
     else:
         if attri == 'dis':
             if is_score:
-                data_path = config.gen_data_path + '_cycle_{}'.format(config.cycle + 1)
+                data_path = config.sim_data_path + '/score_cycle_{}'.format(config.cycle + 1)
             else:
-                data_path = config.gen_data_path + '_cycle_{}'.format(config.cycle)
+                data_path = config.sim_data_path + '/trainD_cycle_{}'.format(config.cycle)
 
         elif attri == 'gen':
-            data_path = config.score_data_path + '_cycle_{}'.format(config.cycle)
+            data_path = config.sim_data_path + '/trainG_cycle_{}'.format(config.cycle)
 
         if rank == 0:
             print(f'Data Path: {data_path} !')

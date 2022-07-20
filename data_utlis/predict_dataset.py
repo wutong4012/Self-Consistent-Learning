@@ -72,7 +72,7 @@ def multiply_pre_score(config, raw_dataset, rank):
     }
 
 
-def gen_postprocess(output_dict, gen_tokenizer, config, rank):
+def gen_postprocess(output_dict, gen_tokenizer, config, rank, for_score=False):
     gc.collect()
     torch.cuda.empty_cache()
     
@@ -90,25 +90,31 @@ def gen_postprocess(output_dict, gen_tokenizer, config, rank):
         item = item.replace(' ', '').split('”的相似句是“')
         raw_text.append(item[0][1:])
         sim_text.append(item[1][:-1])
-        real_ppl_list.append(-output_dict['ppl_list'][idx])  # 加上负号，使其越大越好
+    #     real_ppl_list.append(-output_dict['ppl_list'][idx])  # 加上负号，使其越大越好
 
-    ppl_list = torch.softmax(
-        torch.tensor(real_ppl_list), dim=0).numpy().tolist()
+    # ppl_list = torch.softmax(
+    #     torch.tensor(real_ppl_list), dim=0).numpy().tolist()
     raw_dataset = Dataset.from_dict({
         'text1': raw_text,
         'text2': sim_text,
-        '-ppl': ppl_list,
     })
-    gen_ds_dict = multiply_pre_score(config, raw_dataset, rank)
-    gen_dataset = Dataset.from_dict(gen_ds_dict, features=feats)
+    
+    if for_score:
+        if rank == 0:
+            new_data_path = config.sim_data_path + f'/score_cycle_{config.cycle + 1}'
+            print(f'**********Generate Data Samples is {raw_dataset.num_rows}**********')
+            raw_dataset.save_to_disk(new_data_path)
+            print('**********Gen Data: done!!!**********')
+    
+    else:
+        gen_ds_dict = multiply_pre_score(config, raw_dataset, rank)
+        gen_dataset = Dataset.from_dict(gen_ds_dict, features=feats)
 
-    if rank == 0:
-        new_data_path = config.gen_data_path + f'_cycle_{config.cycle + 1}'
-        if not os.path.exists(new_data_path):
-            os.makedirs(new_data_path)
-        print(f'**********Generate Data Samples is {gen_dataset.num_rows}**********')
-        gen_dataset.save_to_disk(new_data_path)
-        print('**********Gen Data: done!!!**********')
+        if rank == 0:
+            new_data_path = config.sim_data_path + f'/trainD_cycle_{config.cycle + 1}'
+            print(f'**********Generate Data Samples is {gen_dataset.num_rows}**********')
+            gen_dataset.save_to_disk(new_data_path)
+            print('**********Gen Data: done!!!**********')
 
 
 def dis_postprocess(dis_output_dict, config, rank):
@@ -136,10 +142,8 @@ def dis_postprocess(dis_output_dict, config, rank):
     }, features=feats)
 
     if rank == 0:
-        new_data_path = config.score_data_path + f'_cycle_{config.cycle + 1}'
-        if not os.path.exists(new_data_path):
-            os.makedirs(new_data_path)
-        print(f'**********Score Data Samples is {dis_dataset.num_rows}**********')
+        new_data_path = config.sim_data_path + f'/trainG_cycle_{config.cycle + 1}'
+        print(f'**********Score Data 1 Samples is {scores.count(1)}**********')
         dis_dataset.save_to_disk(new_data_path)
         print('**********Score Data: done!!!**********')
 
@@ -220,27 +224,26 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
         if config.use_bustm:
             wudao_ds = load_data(config, rank, is_wudao=True)
             test_ds = datasets.load_from_disk(config.test_sentence_path + '/bustm_sentence')
-            if rank > 0:
-                torch.distributed.barrier()
-            test_ds = test_ds.shuffle(
-                config.seed + config.cycle, 
-                indices_cache_file_name=config.cache_data_path+'/test_shuffle_cache_'+str(config.cycle))
-            if rank == 0:
-                torch.distributed.barrier()
-            start = (config.cycle + 1) * config.bustm_sentence_num % 8000
-            end = (config.cycle + 2) * config.bustm_sentence_num % 8000
-            if end == 0:
-                end = test_ds.num_rows
-            test_ds = test_ds.select(range(start, end))
-            sentence_ds = datasets.concatenate_datasets([wudao_ds, test_ds])
+            test_ds = datasets.concatenate_datasets([wudao_ds, test_ds])
+            start = config.data_num * config.bustm_sentence_num % 8000
+            end = (config.data_num + 1) * config.bustm_sentence_num % 8000
         
         elif config.use_afqmc:
             test_ds = datasets.load_from_disk(config.test_sentence_path + '/afqmc_sentence')
-            start = (config.cycle + 1) * config.afqmc_sentence_num
-            end = (config.cycle + 2) * config.afqmc_sentence_num
-            test_ds = test_ds.select(range(start, end))
-            sentence_ds = test_ds
-            
+            start = config.data_num * config.afqmc_sentence_num % 65000
+            end = (config.data_num + 1) * config.afqmc_sentence_num % 65000
+
+        if rank > 0:
+            torch.distributed.barrier()
+        test_ds = test_ds.shuffle(
+            config.seed + config.data_num, 
+            indices_cache_file_name=config.cache_data_path+'/test_shuffle_'+str(config.data_num))
+        if rank == 0:
+            torch.distributed.barrier()
+        if end == 0:
+            end = test_ds.num_rows
+
+        sentence_ds = test_ds.select(range(start, end))
         if rank == 0:
             print(f'**********The Test_ds Range is {start} ~~ {end}**********')
         predict_dataset = SimGanDataset(sentence_ds)
