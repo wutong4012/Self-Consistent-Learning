@@ -42,8 +42,12 @@ def multiply_pre_score(config, raw_dataset, rank):
                 batch['input_ids'].cuda(), None)
             all_logits.append(torch.softmax(logits, dim=1))
 
-        threshold0 = config.gen_threshold0  # - (config.cycle + 1) * 0.04
-        threshold1 = config.gen_threshold1  # - (config.cycle + 1) * 0.03
+        threshold0 = config.gen_threshold0 - (config.cycle + 1) * 0.04
+        if threshold0 < 0.5:
+            threshold0 = 0.5
+        threshold1 = config.gen_threshold1 + (config.cycle + 1) * 0.04
+        if threshold1 > 0.9:
+            threshold1 =0.9
         all_logits = torch.cat(all_logits, dim=0)
         assert all_logits.size(0) == raw_dataset.num_rows
         

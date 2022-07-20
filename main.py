@@ -44,7 +44,7 @@ def concat_data(raw_list):  # List[Dict]<-(world_size, batch_num)
     return concate_output
 
 
-def generator_cycle(config):
+def generator_cycle(config, fit=False):
     gen_ckpt_callback = ModelCheckpoint(
         save_top_k=1,
         monitor='gen_val_loss',
@@ -65,18 +65,19 @@ def generator_cycle(config):
     gen_system = GenSystem(config)
 
     torch.cuda.empty_cache()
-    if config.cycle != -1:
+    if fit:
         gen_trainer.fit(gen_system)
 
-    for_score = False
-    for idx in range(2):
-        if idx == 1:
-            if gen_system.global_rank == 0:
-                print('**********Starting Predict Again for Score...**********')
-            for_score = True
-        gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
-        gen_postprocess(gen_output, gen_system.gen_tokenizer, 
-                        config, gen_system.global_rank, for_score=for_score)
+    else:
+        for_score = False
+        for idx in range(2):
+            if idx == 1:
+                if gen_system.global_rank == 0:
+                    print('**********Starting Predict Again for Score...**********')
+                for_score = True
+            gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
+            gen_postprocess(gen_output, gen_system.gen_tokenizer, 
+                            config, gen_system.global_rank, for_score=for_score)
 
 
 def discriminator_cycle(config):
@@ -119,6 +120,9 @@ def run(config):
         print('**********Cycle: {}**********'.format(config.cycle))
 
         if not config.pretrain_dis:
+            if config.cycle != -1:
+                generator_cycle(config, fit=True)
+                gc.collect()
             generator_cycle(config)
             gc.collect()
         discriminator_cycle(config)
