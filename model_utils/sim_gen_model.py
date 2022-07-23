@@ -20,6 +20,7 @@ class Discriminator(nn.Module):
             return
 
         if config.warm_up_model:
+            print('Use Warm Up Model...')
             if config.cycle == 0 or config.cycle == -1:
                 if config.use_bustm:
                     pt_path = config.dis_model_path + '/roberta_large.pt'

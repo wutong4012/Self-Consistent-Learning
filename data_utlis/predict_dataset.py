@@ -42,12 +42,12 @@ def multiply_pre_score(config, raw_dataset, rank):
                 batch['input_ids'].cuda(), None)
             all_logits.append(torch.softmax(logits, dim=1))
 
-        threshold0 = config.gen_threshold0 - (config.cycle + 1) * 0.04
-        if threshold0 < 0.5:
-            threshold0 = 0.5
-        threshold1 = config.gen_threshold1 + (config.cycle + 1) * 0.04
-        if threshold1 > 0.9:
-            threshold1 =0.9
+        threshold0 = config.gen_threshold0  # - (config.cycle + 1) * 0.04
+        if threshold0 < 0.7:
+            threshold0 = 0.7
+        threshold1 = config.gen_threshold1 - (config.cycle + 1) * 0.04
+        if threshold1 < 0.6:
+            threshold1 = 0.6
         all_logits = torch.cat(all_logits, dim=0)
         assert all_logits.size(0) == raw_dataset.num_rows
         
@@ -224,32 +224,38 @@ def dis_pred_collate(batch_data, dis_tokenizer):
 def create_predict_dataloader(config, tokenizer, rank, attri):
     if attri == 'gen':
         batch_size = config.pre_gen_bs
-
-        if config.use_bustm:
-            wudao_ds = load_data(config, rank, is_wudao=True)
-            test_ds = datasets.load_from_disk(config.test_sentence_path + '/bustm_sentence')
-            test_ds = datasets.concatenate_datasets([wudao_ds, test_ds])
-            start = config.data_num * config.bustm_sentence_num % 8000
-            end = (config.data_num + 1) * config.bustm_sentence_num % 8000
         
-        elif config.use_afqmc:
-            test_ds = datasets.load_from_disk(config.test_sentence_path + '/afqmc_sentence')
-            start = config.data_num * config.afqmc_sentence_num % 65000
-            end = (config.data_num + 1) * config.afqmc_sentence_num % 65000
+        if config.only_use_wudao:
+            sentence_ds = load_data(config, rank, is_wudao=True)
 
-        if rank > 0:
-            torch.distributed.barrier()
-        test_ds = test_ds.shuffle(
-            config.seed + config.data_num, 
-            indices_cache_file_name=config.cache_data_path+'/test_shuffle_'+str(config.data_num))
-        if rank == 0:
-            torch.distributed.barrier()
-        if end == 0:
-            end = test_ds.num_rows
+        else:
+            if config.use_bustm:
+                wudao_ds = load_data(config, rank, is_wudao=True)
+                test_ds = datasets.load_from_disk(config.test_sentence_path + '/bustm_sentence')
+                start = config.data_num * config.bustm_sentence_num % 8000
+                end = (config.data_num + 1) * config.bustm_sentence_num % 8000
+            
+            elif config.use_afqmc:
+                test_ds = datasets.load_from_disk(config.test_sentence_path + '/afqmc_sentence')
+                start = config.data_num * config.afqmc_sentence_num % 65000
+                end = (config.data_num + 1) * config.afqmc_sentence_num % 65000
 
-        sentence_ds = test_ds.select(range(start, end))
-        if rank == 0:
-            print(f'**********The Test_ds Range is {start} ~~ {end}**********')
+            if rank > 0:
+                torch.distributed.barrier()
+            test_ds = test_ds.shuffle(
+                config.seed + config.data_num, 
+                indices_cache_file_name=config.cache_data_path+'/test_shuffle_'+str(config.data_num))
+            if rank == 0:
+                torch.distributed.barrier()
+            if end == 0:
+                end = test_ds.num_rows
+
+            sentence_ds = test_ds.select(range(start, end))
+            if config.use_bustm:
+                sentence_ds = datasets.concatenate_datasets([wudao_ds, sentence_ds])
+            if rank == 0:
+                print(f'**********The Test_ds Range is {start} ~~ {end}**********')
+
         predict_dataset = SimGanDataset(sentence_ds)
 
         def collate_fn(batch_data):

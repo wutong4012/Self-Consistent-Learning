@@ -103,14 +103,14 @@ def load_data(config, rank, is_labeled=False, is_wudao=False,
         if config.use_bustm:
             sim_dataset = datasets.load_from_disk(config.lab_data_path + '/labeled_data')
         elif config.use_afqmc:
-            sim_dataset = datasets.load_from_disk(config.lab_data_path + '/afqmc_labeled_data')
-        if rank > 0:
-            torch.distributed.barrier()
-        sim_dataset = sim_dataset.shuffle(
-            config.seed + config.cycle, 
-            indices_cache_file_name=config.cache_data_path+'/shuffle_cache_'+str(config.cycle))
-        if rank == 0:
-            torch.distributed.barrier()
+            sim_dataset = datasets.load_from_disk(config.lab_data_path + '/labeled_afqmc')  #TODO
+        # if rank > 0:
+        #     torch.distributed.barrier()
+        # sim_dataset = sim_dataset.shuffle(
+        #     config.seed + config.cycle, 
+        #     indices_cache_file_name=config.cache_data_path+'/shuffle_cache_'+str(config.cycle))
+        # if rank == 0:
+        #     torch.distributed.barrier()
 
     else:
         if attri == 'dis':
@@ -249,7 +249,7 @@ def set_dataset(config, use_label, use_gen, attri, rank):
         if config.use_bustm:
             test_data = datasets.load_from_disk(config.test_data_path + '/bustm')
         elif config.use_afqmc:
-            test_data = datasets.load_from_disk(config.test_data_path + '/afqmc')
+            test_data = datasets.load_from_disk(config.test_data_path + '/afqmc_test')  #TODO
         val_dataset = SimGanDataset(data=test_data)
 
     if rank == 0:
