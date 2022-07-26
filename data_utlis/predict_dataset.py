@@ -202,9 +202,9 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
             start = config.data_num * 3000 % 9000
             end = (config.data_num + 1) * 3000 % 9000
         
-        elif config.data_name == 'bustm':
-            start = config.data_num * 2000 % 8000
-            end = (config.data_num + 1) * 2000 % 8000
+        elif config.data_name == 'oppo':
+            start = config.data_num * 7000 % 42000
+            end = (config.data_num + 1) * 7000 % 42000
         
         elif config.data_name == 'afqmc':
             start = config.data_num * 10000 % 80000

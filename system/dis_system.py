@@ -88,13 +88,6 @@ class DisSystem(LightningModule):
         )
         self.log('dis_val_loss', loss.item())
 
-        predictions = torch.argmax(logits, dim=1).tolist()
-        if self.config.val_metric == 'f1':
-            score = f1_score(batch['labels'].tolist(), predictions)
-        elif self.config.val_metric == 'acc':
-            score = accuracy_score(batch['labels'].tolist(), predictions)
-        self.log('dis_score', score)
-
         return loss
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
