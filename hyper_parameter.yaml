@@ -11,9 +11,9 @@ test_data_path: /cognitive_comp/wutong/source/sim_data/sim_test_data/
 lab_data_path: /cognitive_comp/wutong/source/sim_data/similarity_data/
 
 # 需要修改文件名
-ckpt_model_path: /cognitive_comp/wutong/similarity_generation/experiments/lightning_logs/checkpoints_  ## 
-sim_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_data_  ##
-cache_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_cache_  ##
+ckpt_model_path: /cognitive_comp/wutong/similarity_generation/experiments/lightning_logs/checkpoints  ## 
+sim_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_data  ##
+cache_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_cache  ##
 
 top_k: 0
 top_p: 0.95
@@ -50,4 +50,4 @@ checkpoint_steps: 10
 es_patience: 1  ####
 
 val_metric: f1  # f1 / acc
-data_name: afqmc  # chip / bustm / afqmc / qqp  ## 
+data_name: chip  # chip / bustm / afqmc / qqp

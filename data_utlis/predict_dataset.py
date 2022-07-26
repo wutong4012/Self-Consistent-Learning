@@ -196,7 +196,7 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
         test_ds = datasets.load_from_disk(config.test_sentence_path + config.data_name + '_sentence')
         if config.data_name == 'chip':
             start = config.data_num * 5000 % 20000
-            end = (config.data_num + 1) * 5000 % 9000
+            end = (config.data_num + 1) * 5000 % 20000
         
         elif config.data_name == 'qqp':
             start = config.data_num * 3000 % 9000
