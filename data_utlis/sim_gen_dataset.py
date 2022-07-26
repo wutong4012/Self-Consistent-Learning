@@ -1,6 +1,5 @@
 import glob
 import random
-from regex import F
 
 import torch
 import datasets
@@ -85,37 +84,22 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
     return sim_dataset
 
 
-def load_data(config, rank, is_labeled=False, is_wudao=False,
-              is_score=False, attri=None):
-    if is_wudao:
-        cache_dict_paths = glob.glob(config.wudao_data_path + '/*')
-        cache_dict_paths = cache_dict_paths[
-            config.data_num * 2 : (config.data_num + 1) * 2]
-
-        wudao_ds_list = []
-        for path in cache_dict_paths:
-            wudao_ds_list.append(datasets.load_from_disk(path))
-        wudao_ds = datasets.concatenate_datasets(wudao_ds_list)
-
-        return wudao_ds
-
+def load_data(config, rank, is_labeled=False, is_score=False, attri=None):
     if is_labeled:
-        if config.use_bustm:
-            sim_dataset = datasets.load_from_disk(config.lab_data_path + '/labeled_data')
-        elif config.use_afqmc:
-            sim_dataset = datasets.load_from_disk(config.lab_data_path + '/labeled_afqmc')  #TODO
-        # if rank > 0:
-        #     torch.distributed.barrier()
-        # sim_dataset = sim_dataset.shuffle(
-        #     config.seed + config.cycle, 
-        #     indices_cache_file_name=config.cache_data_path+'/shuffle_cache_'+str(config.cycle))
-        # if rank == 0:
-        #     torch.distributed.barrier()
+        sim_dataset = datasets.load_from_disk(
+            config.lab_data_path + 'labeled_' + config.data_name + '_ds')
+        if rank > 0:
+            torch.distributed.barrier()
+        sim_dataset = sim_dataset.shuffle(
+            config.seed + config.cycle, 
+            indices_cache_file_name=config.cache_data_path+'/shuffle_cache_'+str(config.cycle))
+        if rank == 0:
+            torch.distributed.barrier()
 
     else:
         if attri == 'dis':
             if is_score:
-                data_path = config.sim_data_path + '/score_cycle_{}'.format(config.cycle + 1)
+                data_path = config.sim_data_path + '/trainD_cycle_{}'.format(config.cycle + 1)
             else:
                 data_path = config.sim_data_path + '/trainD_cycle_{}'.format(config.cycle)
 
@@ -208,48 +192,46 @@ def set_gen_dataset(config, rank, part_labeled_data, generated_data):
 
 
 def set_dataset(config, use_label, use_gen, attri, rank):
-    if use_label and not use_gen:
-        data = load_data(config, rank, is_labeled=True)
+    if not config.pretrain_dis:
+        if use_label and not use_gen:
+            data = load_data(config, rank, is_labeled=True)
 
-    elif use_gen and not use_label:
-        data = load_data(config, rank, is_labeled=False, attri=attri)
+        elif use_gen and not use_label:
+            data = load_data(config, rank, is_labeled=False, attri=attri)
 
-    elif use_gen and use_label:
-        labeled_data = load_data(config, rank, is_labeled=True)
-        generated_data = load_data(config, rank, is_labeled=False, attri=attri)
+        elif use_gen and use_label:
+            labeled_data = load_data(config, rank, is_labeled=True)
+            generated_data = load_data(config, rank, is_labeled=False, attri=attri)
 
-        start, end = (config.cycle * generated_data.num_rows), (
-            (config.cycle + 1) * generated_data.num_rows)
-        part_labeled_data = labeled_data.select(range(start, end))
+            start, end = (config.cycle * generated_data.num_rows), (
+                (config.cycle + 1) * generated_data.num_rows)
+            part_labeled_data = labeled_data.select(range(start, end))
 
-        if rank == 0:
-            random_list = random.sample(range(part_labeled_data.num_rows), 10)
-            for i in random_list:
-                print('Labeled Examples: {}'.format(part_labeled_data[i]))
-            random_list = random.sample(range(generated_data.num_rows), 10)
-            for i in random_list:
-                print('Generated Examples: {}'.format(generated_data[i]))
+            if rank == 0:
+                random_list = random.sample(range(part_labeled_data.num_rows), 10)
+                for i in random_list:
+                    print('Labeled Examples: {}'.format(part_labeled_data[i]))
+                random_list = random.sample(range(generated_data.num_rows), 10)
+                for i in random_list:
+                    print('Generated Examples: {}'.format(generated_data[i]))
 
-        if attri == 'dis':
-            data = set_dis_dataset(
-                config, rank, start, end, part_labeled_data, generated_data, labeled_data)
+            if attri == 'dis':
+                data = set_dis_dataset(
+                    config, rank, start, end, part_labeled_data, generated_data, labeled_data)
 
-        elif attri == 'gen':
-            data = set_gen_dataset(
-                config, rank, part_labeled_data, generated_data)
+            elif attri == 'gen':
+                data = set_gen_dataset(
+                    config, rank, part_labeled_data, generated_data)
 
     if config.pretrain_dis:
-        train_data = datasets.load_from_disk(config.lab_data_path + '/train_labeled_data')
+        train_data = datasets.load_from_disk(config.lab_data_path + config.pretrain_train_name)
         train_dataset = SimGanDataset(data=train_data)
-        test_data = datasets.load_from_disk(config.lab_data_path + '/test_labeled_data')
+        test_data = datasets.load_from_disk(config.test_data_path + config.pretrain_test_name)
         val_dataset = SimGanDataset(data=test_data)
         
     else:
         train_dataset = SimGanDataset(data=data)
-        if config.use_bustm:
-            test_data = datasets.load_from_disk(config.test_data_path + '/bustm')
-        elif config.use_afqmc:
-            test_data = datasets.load_from_disk(config.test_data_path + '/afqmc_test')  #TODO
+        test_data = datasets.load_from_disk(config.test_data_path + config.data_name)
         val_dataset = SimGanDataset(data=test_data)
 
     if rank == 0:

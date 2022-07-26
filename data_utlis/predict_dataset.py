@@ -42,12 +42,12 @@ def multiply_pre_score(config, raw_dataset, rank):
                 batch['input_ids'].cuda(), None)
             all_logits.append(torch.softmax(logits, dim=1))
 
-        threshold0 = config.gen_threshold0  # - (config.cycle + 1) * 0.04
-        if threshold0 < 0.7:
-            threshold0 = 0.7
-        threshold1 = config.gen_threshold1 - (config.cycle + 1) * 0.04
-        if threshold1 < 0.6:
-            threshold1 = 0.6
+        threshold0 = config.gen_threshold0 + (config.cycle + 1) * 0.04
+        if threshold0 > 0.9:
+            threshold0 = 0.9
+        threshold1 = config.gen_threshold1 + (config.cycle + 1) * 0.04
+        if threshold1 > 0.9:
+            threshold1 = 0.9
         all_logits = torch.cat(all_logits, dim=0)
         assert all_logits.size(0) == raw_dataset.num_rows
         
@@ -76,7 +76,7 @@ def multiply_pre_score(config, raw_dataset, rank):
     }
 
 
-def gen_postprocess(output_dict, gen_tokenizer, config, rank, for_score=False):
+def gen_postprocess(output_dict, gen_tokenizer, config, rank):
     gc.collect()
     torch.cuda.empty_cache()
     
@@ -102,23 +102,15 @@ def gen_postprocess(output_dict, gen_tokenizer, config, rank, for_score=False):
         'text1': raw_text,
         'text2': sim_text,
     })
-    
-    if for_score:
-        if rank == 0:
-            new_data_path = config.sim_data_path + f'/score_cycle_{config.cycle + 1}'
-            print(f'**********Generate Data Samples is {raw_dataset.num_rows}**********')
-            raw_dataset.save_to_disk(new_data_path)
-            print('**********Gen Data: done!!!**********')
-    
-    else:
-        gen_ds_dict = multiply_pre_score(config, raw_dataset, rank)
-        gen_dataset = Dataset.from_dict(gen_ds_dict, features=feats)
 
-        if rank == 0:
-            new_data_path = config.sim_data_path + f'/trainD_cycle_{config.cycle + 1}'
-            print(f'**********Generate Data Samples is {gen_dataset.num_rows}**********')
-            gen_dataset.save_to_disk(new_data_path)
-            print('**********Gen Data: done!!!**********')
+    gen_ds_dict = multiply_pre_score(config, raw_dataset, rank)
+    gen_dataset = Dataset.from_dict(gen_ds_dict, features=feats)
+
+    if rank == 0:
+        new_data_path = config.sim_data_path + f'/trainD_cycle_{config.cycle + 1}'
+        print(f'**********Generate Data Samples is {gen_dataset.num_rows}**********')
+        gen_dataset.save_to_disk(new_data_path)
+        print('**********Gen Data: done!!!**********')
 
 
 def dis_postprocess(dis_output_dict, config, rank):
@@ -155,32 +147,8 @@ def dis_postprocess(dis_output_dict, config, rank):
 def gen_pred_collate(batch_data, gen_tokenizer, config):
     input_ids, length_list = [], []
     for item in batch_data:
-        item = item['sentence_list']
-        if item is None or item == []:
-            continue
-
-        # wudao_ds 每段话只随机选一条句子
-        if len(item) > 1:
-            flag = 1
-            random_num = random.sample(range(len(item)), 1)[0]
-            for idx in range(0, len(item)):
-                if len(item[idx]) < 5 or len(item[idx]) > 50:
-                    continue
-                else:
-                    random_num = idx
-                    flag = 0
-                    break
-            if flag:
-                continue
-        # test_ds 列表里只有一句话
-        elif len(item) == 1:
-            if config.use_afqmc:
-                if len(item[0]) < 5 or len(item[0]) > 50:
-                    continue
-            random_num = 0
-
         cur_input_ids = gen_tokenizer(
-            '<bos>“' + item[random_num] + '”的相似句是“', return_tensors='pt'
+            '<bos>“' + item['sentence'] + '”的相似句是“', return_tensors='pt'
         ).input_ids.squeeze()[:-1]  # 不能加<eos>
 
         # 每个样本复制 N 份
@@ -224,37 +192,29 @@ def dis_pred_collate(batch_data, dis_tokenizer):
 def create_predict_dataloader(config, tokenizer, rank, attri):
     if attri == 'gen':
         batch_size = config.pre_gen_bs
+
+        test_ds = datasets.load_from_disk(config.test_sentence_path + config.data_name + '_sentence')
+        if config.data_name == 'chip':
+            start = config.data_num * 5000 % 20000
+            end = (config.data_num + 1) * 5000 % 9000
         
-        if config.only_use_wudao:
-            sentence_ds = load_data(config, rank, is_wudao=True)
+        elif config.data_name == 'qqp':
+            start = config.data_num * 3000 % 9000
+            end = (config.data_num + 1) * 3000 % 9000
+        
+        elif config.data_name == 'bustm':
+            start = config.data_num * 2000 % 8000
+            end = (config.data_num + 1) * 2000 % 8000
+        
+        elif config.data_name == 'afqmc':
+            start = config.data_num * 10000 % 70000
+            end = (config.data_num + 1) * 10000 % 70000
 
-        else:
-            if config.use_bustm:
-                wudao_ds = load_data(config, rank, is_wudao=True)
-                test_ds = datasets.load_from_disk(config.test_sentence_path + '/bustm_sentence')
-                start = config.data_num * config.bustm_sentence_num % 8000
-                end = (config.data_num + 1) * config.bustm_sentence_num % 8000
-            
-            elif config.use_afqmc:
-                test_ds = datasets.load_from_disk(config.test_sentence_path + '/afqmc_sentence')
-                start = config.data_num * config.afqmc_sentence_num % 65000
-                end = (config.data_num + 1) * config.afqmc_sentence_num % 65000
-
-            if rank > 0:
-                torch.distributed.barrier()
-            test_ds = test_ds.shuffle(
-                config.seed + config.data_num, 
-                indices_cache_file_name=config.cache_data_path+'/test_shuffle_'+str(config.data_num))
-            if rank == 0:
-                torch.distributed.barrier()
-            if end == 0:
-                end = test_ds.num_rows
-
-            sentence_ds = test_ds.select(range(start, end))
-            if config.use_bustm:
-                sentence_ds = datasets.concatenate_datasets([wudao_ds, sentence_ds])
-            if rank == 0:
-                print(f'**********The Test_ds Range is {start} ~~ {end}**********')
+        if end == 0:
+            end = test_ds.num_rows
+        sentence_ds = test_ds.select(range(start, end))
+        if rank == 0:
+            print(f'**********The Test_ds Range is {start} ~~ {end}**********')
 
         predict_dataset = SimGanDataset(sentence_ds)
 

@@ -26,7 +26,6 @@ def set_trainer(config, ckpt_callback, early_stopping):
         log_every_n_steps=1,
         num_sanity_val_steps=0,
         check_val_every_n_epoch=1,
-        # val_check_interval=100,
         callbacks=[lr_callback, ckpt_callback, early_stopping],
         max_epochs=50,
     )
@@ -44,7 +43,7 @@ def concat_data(raw_list):  # List[Dict]<-(world_size, batch_num)
     return concate_output
 
 
-def generator_cycle(config, fit=False):
+def generator_cycle(config):
     gen_ckpt_callback = ModelCheckpoint(
         save_top_k=1,
         monitor='gen_val_loss',
@@ -65,33 +64,25 @@ def generator_cycle(config, fit=False):
     gen_system = GenSystem(config)
 
     torch.cuda.empty_cache()
-    if fit:
+    if config.cycle != -1:
         gen_trainer.fit(gen_system)
-
-    else:
-        for_score = False
-        for idx in range(2):
-            if idx == 1:
-                if gen_system.global_rank == 0:
-                    print('**********Starting Predict Again for Score...**********')
-                for_score = True
-            gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
-            gen_postprocess(gen_output, gen_system.gen_tokenizer, 
-                            config, gen_system.global_rank, for_score=for_score)
+    gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
+    gen_postprocess(gen_output, gen_system.gen_tokenizer, 
+                    config, gen_system.global_rank)
 
 
 def discriminator_cycle(config):
     dis_ckpt_callback = ModelCheckpoint(
         save_top_k=1,
-        monitor='dis_f1_score',
-        mode='max',
+        monitor='dis_val_loss',
+        mode='min',
         filename=f'discriminator_cycle_{config.cycle + 1}',
         dirpath=config.ckpt_model_path,
     )
     dis_early_stopping = EarlyStopping(
-        monitor='dis_f1_score',
+        monitor='dis_val_loss',
         patience=config.es_patience,
-        mode='max'
+        mode='min'
     )
     dis_trainer = set_trainer(
         config=config,
@@ -120,9 +111,6 @@ def run(config):
         print('**********Cycle: {}**********'.format(config.cycle))
 
         if not config.pretrain_dis:
-            if config.cycle != -1:
-                generator_cycle(config, fit=True)
-                gc.collect()
             generator_cycle(config)
             gc.collect()
         discriminator_cycle(config)

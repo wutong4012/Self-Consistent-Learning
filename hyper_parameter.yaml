@@ -3,43 +3,43 @@ exp_dir: /cognitive_comp/wutong/similarity_generation/experiments/
 txl_config_path: /cognitive_comp/wutong/similarity_generation/model_utils/txl_5B_config.json
 
 txl_model_path: /cognitive_comp/wutong/source/model_base/txl_zh_5.0B.pt
-dis_model_path: /cognitive_comp/wutong/source/model_base
+dis_model_path: /cognitive_comp/wutong/source/model_base/
 sp_model_path: /cognitive_comp/wutong/source/model_base/chinese_sentencepiece/cog-pretrain.model
 
-wudao_data_path: /cognitive_comp/wutong/source/data_base/wudao_sentences
-test_sentence_path: /cognitive_comp/wutong/source/data_base/test_sentences
-test_data_path: /cognitive_comp/wutong/source/data_base/sim_test_data
-lab_data_path: /cognitive_comp/wutong/source/data_base/similarity_data
+test_sentence_path: /cognitive_comp/wutong/source/sim_data/predict_sentences/
+test_data_path: /cognitive_comp/wutong/source/sim_data/sim_test_data/
+lab_data_path: /cognitive_comp/wutong/source/sim_data/similarity_data/
 
 # 需要修改文件名
 ckpt_model_path: /cognitive_comp/wutong/similarity_generation/experiments/lightning_logs/checkpoints_  ## 
-sim_data_path: /cognitive_comp/wutong/source/data_base/sim_cycle_data_  ##
-cache_data_path: /cognitive_comp/wutong/source/data_base/sim_cycle_cache_  ##
+sim_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_data_  ##
+cache_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_cache_  ##
 
 top_k: 0
 top_p: 0.95
 repetition_penalty: 1.0
 
-gen_threshold0: 0.9  # 上一轮的 D 预测为0的阈值  #####
-gen_threshold1: 0.8  # 上一轮的 D 预测为1的阈值  #####
+gen_threshold0: 0.7  # 上一轮的 D 预测为0的阈值
+gen_threshold1: 0.7  # 上一轮的 D 预测为1的阈值
 dis_threshold: 0.7  # Discriminator选择为0/1的阈值
-gen_anti_cyle: -10  # 刚开始先对抗的轮数
-gen_repeat_times: 1  # 每条句子重复生成的次数 ###
+gen_repeat_times: 1  # 每条句子重复生成的次数
 
 dis_batch_size: 128  # 128 / 384
 gen_batch_size: 2
 gen_big_batch_size: 30
-pre_gen_bs: 512  # 生成样本的batch size ###
+pre_gen_bs: 512  # 生成样本的batch size
 pre_dis_bs: 1024
 
-warm_up_model: False  #$$
-confront: False
+warm_up_model: True  #$$
 pretrain_dis: False  ####
+pretrain_train_name: /chip_train_ds
+pretrain_test_name: /chip
 dis_hidden_size: 1024
-discriminator: IDEA-CCNL/Erlangshen-Roberta-330M-Similarity  # hfl/chinese-roberta-wwm-ext-large / IDEA-CCNL/Erlangshen-Roberta-330M-Similarity
+discriminator: hfl/chinese-roberta-wwm-ext-large ##
+# hfl/chinese-roberta-wwm-ext-large / IDEA-CCNL/Erlangshen-Roberta-330M-Similarity
 
 learning_rate: 2e-5
-cycle_num: 50
+cycle_num: 50  ####
 cycle: -1  ####
 data_num: -1
 
@@ -49,9 +49,5 @@ warmup_steps: 20  ####
 checkpoint_steps: 10
 es_patience: 1  ####
 
-use_afqmc: True
-use_bustm: False
-only_use_wudao: True
-
-afqmc_sentence_num: 5000 ###
-bustm_sentence_num: 2000 ###
+val_metric: f1  # f1 / acc
+data_name: afqmc  # chip / bustm / afqmc / qqp  ## 

@@ -1,5 +1,5 @@
-import evaluate
 import torch
+from sklearn.metrics import accuracy_score, f1_score
 from pytorch_lightning import LightningModule
 from transformers import BertTokenizer
 from transformers.optimization import AdamW, get_cosine_schedule_with_warmup
@@ -16,17 +16,11 @@ class DisSystem(LightningModule):
         self.config = config
         print('\nInitialize Discriminator...')
 
-        self.f1_metric = evaluate.load("f1")
         self._set_tokenizers_and_models()
 
     def set_dis_dataset(self):
-        if self.config.pretrain_dis:
-            use_gen = False
-        else:
-            use_gen = True
-
         self.train_dataset, self.val_dataset = \
-            set_dataset(self.config, use_label=True, use_gen=use_gen,
+            set_dataset(self.config, use_label=True, use_gen=True,
                         attri='dis', rank=self.global_rank)
 
     def _set_tokenizers_and_models(self):
@@ -94,12 +88,12 @@ class DisSystem(LightningModule):
         )
         self.log('dis_val_loss', loss.item())
 
-        predictions = torch.argmax(logits, dim=1)
-        f1_score = self.f1_metric.compute(
-            references=batch['labels'],
-            predictions=predictions
-        )
-        self.log('dis_f1_score', f1_score['f1'])
+        predictions = torch.argmax(logits, dim=1).tolist()
+        if self.config.val_metric == 'f1':
+            score = f1_score(batch['labels'].tolist(), predictions)
+        elif self.config.val_metric == 'acc':
+            score = accuracy_score(batch['labels'].tolist(), predictions)
+        self.log('dis_score', score)
 
         return loss
 
