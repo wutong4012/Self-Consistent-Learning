@@ -116,8 +116,7 @@ def load_data(config, rank, is_labeled=False, is_score=False, attri=None):
     return sim_dataset
 
 
-def set_dis_dataset(config, rank, start, end,
-                    part_labeled_data, generated_data, labeled_data):
+def set_dis_dataset(config, rank, part_labeled_data, generated_data, labeled_data):
     assert part_labeled_data.features.type == generated_data.features.type
 
     if rank > 0:
@@ -134,23 +133,20 @@ def set_dis_dataset(config, rank, start, end,
     ).num_rows
 
     if gen_pos_nums > gen_neg_nums:
-        def filter_fn(example, idx):
-            return ((idx <= start) or (idx >= end)) and (example['score'] == 0)
         delta_data = labeled_data.filter(
-            filter_fn, with_indices=True,
+            lambda example: example['score'] == 0, with_indices=True,
             cache_file_name=config.cache_data_path+'/lab_neg_cache_'+str(config.cycle))
     
     else:
-        def filter_fn(example, idx):
-            return ((idx <= start) or (idx >= end)) and (example['score'] == 1)
         delta_data = labeled_data.filter(
-            filter_fn, with_indices=True,
+            lambda example: example['score'] == 1, with_indices=True,
             cache_file_name=config.cache_data_path+'/lab_pos_cache_'+str(config.cycle))
     
     if rank == 0:
         torch.distributed.barrier()
 
-    delta_data = delta_data.select(range(abs(gen_pos_nums - gen_neg_nums)))
+    if abs(gen_pos_nums - gen_neg_nums) < delta_data.num_rows:
+        delta_data = delta_data.select(range(abs(gen_pos_nums - gen_neg_nums)))
     data = datasets.concatenate_datasets(
             [part_labeled_data, generated_data, delta_data])
 
@@ -202,10 +198,7 @@ def set_dataset(config, use_label, use_gen, attri, rank):
         elif use_gen and use_label:
             labeled_data = load_data(config, rank, is_labeled=True)
             generated_data = load_data(config, rank, is_labeled=False, attri=attri)
-
-            start, end = (config.cycle * generated_data.num_rows), (
-                (config.cycle + 1) * generated_data.num_rows)
-            part_labeled_data = labeled_data.select(range(start, end))
+            part_labeled_data = labeled_data.select(range(generated_data.num_rows))
 
             if rank == 0:
                 random_list = random.sample(range(part_labeled_data.num_rows), 10)
@@ -217,7 +210,7 @@ def set_dataset(config, use_label, use_gen, attri, rank):
 
             if attri == 'dis':
                 data = set_dis_dataset(
-                    config, rank, start, end, part_labeled_data, generated_data, labeled_data)
+                    config, rank, part_labeled_data, generated_data, labeled_data)
 
             elif attri == 'gen':
                 data = set_gen_dataset(
