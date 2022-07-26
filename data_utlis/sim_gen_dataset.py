@@ -134,12 +134,12 @@ def set_dis_dataset(config, rank, part_labeled_data, generated_data, labeled_dat
 
     if gen_pos_nums > gen_neg_nums:
         delta_data = labeled_data.filter(
-            lambda example: example['score'] == 0, with_indices=True,
+            lambda example: example['score'] == 0,
             cache_file_name=config.cache_data_path+'/lab_neg_cache_'+str(config.cycle))
     
     else:
         delta_data = labeled_data.filter(
-            lambda example: example['score'] == 1, with_indices=True,
+            lambda example: example['score'] == 1,
             cache_file_name=config.cache_data_path+'/lab_pos_cache_'+str(config.cycle))
     
     if rank == 0:
