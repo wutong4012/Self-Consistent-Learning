@@ -8,16 +8,16 @@ sp_model_path: /cognitive_comp/wutong/source/model_base/chinese_sentencepiece/co
 
 test_sentence_path: /cognitive_comp/wutong/source/sim_data/predict_sentences/
 test_data_path: /cognitive_comp/wutong/source/sim_data/sim_test_data/
-lab_data_path: /cognitive_comp/wutong/source/sim_data/similarity_data/
+lab_data_path: /cognitive_comp/wutong/source/sim_data/sim_train_data/
 
 # 需要修改文件名
-ckpt_model_path: /cognitive_comp/wutong/similarity_generation/experiments/lightning_logs/checkpoints  ## 
-sim_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_data  ##
-cache_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_cache  ##
+ckpt_model_path: /cognitive_comp/wutong/similarity_generation/experiments/lightning_logs/checkpoints_  ## 
+sim_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_data_  ##
+cache_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_cache_  ##
 
 top_k: 0
 top_p: 0.95
-repetition_penalty: 1.0
+repetition_penalty: 1.5
 
 gen_threshold0: 0.7  # 上一轮的 D 预测为0的阈值
 gen_threshold1: 0.7  # 上一轮的 D 预测为1的阈值
@@ -30,24 +30,20 @@ gen_big_batch_size: 30
 pre_gen_bs: 512  # 生成样本的batch size
 pre_dis_bs: 1024
 
-warm_up_model: True  #$$
-pretrain_dis: False  ####
-pretrain_train_name: /chip_train_ds
-pretrain_test_name: /chip
+warm_up_model: False  ####
+pretrain_dis: True  ####
 dis_hidden_size: 1024
 discriminator: hfl/chinese-roberta-wwm-ext-large ##
 # hfl/chinese-roberta-wwm-ext-large / IDEA-CCNL/Erlangshen-Roberta-330M-Similarity
 
 learning_rate: 2e-5
-cycle_num: 50  ####
-cycle: -1  ####
+cycle_num: 1  ####
+cycle: 0  ####
 data_num: -1
 
 gen_train_steps: 200
-dis_train_steps: 200  ####
-warmup_steps: 20  ####
+dis_train_steps: 2000  ####
+warmup_steps: 200  ####
 checkpoint_steps: 10
-es_patience: 1  ####
-
-val_metric: f1  # f1 / acc
-data_name: chip  # chip / bustm / afqmc / qqp
+es_patience: 3  ####
+data_name: oppo  # chip / oppo / afqmc / qqp  ##

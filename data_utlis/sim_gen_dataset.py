@@ -217,9 +217,10 @@ def set_dataset(config, use_label, use_gen, attri, rank):
                     config, rank, part_labeled_data, generated_data)
 
     if config.pretrain_dis:
-        train_data = datasets.load_from_disk(config.lab_data_path + config.pretrain_train_name)
+        train_data = datasets.load_from_disk(
+            config.lab_data_path + config.data_name + '_train_ds')
         train_dataset = SimGanDataset(data=train_data)
-        test_data = datasets.load_from_disk(config.test_data_path + config.pretrain_test_name)
+        test_data = datasets.load_from_disk(config.test_data_path + config.data_name)
         val_dataset = SimGanDataset(data=test_data)
         
     else:
