@@ -1,4 +1,3 @@
-import glob
 import random
 
 import torch
@@ -44,17 +43,15 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
         return record[-1][-1]
 
     def process_equal(example):
-        if min(len(example['text1']), len(example['text2'])) < 5:  # 最小长度设为5
+        if len(example['text2']) < 5:  # 最小长度设为5
             example['score'] = -1
-        elif max(len(example['text1']), len(example['text2'])) > 50:  # 最大长度设为50
+        elif len(example['text2']) > 50:  # 最大长度设为50
             example['score'] = -2
         else:
-            delta = min(len(example['text1']), len(
-                example['text2'])) - LCS(example['text1'], example['text2'])
+            delta = min(len(example['text1']), len(example['text2'])) \
+                - LCS(example['text1'], example['text2'])
             if delta <= 1:
                 example['score'] = -3
-            elif delta <= 2:
-                example['score'] = -4
         return example
 
     if rank > 0:
@@ -74,9 +71,6 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
         cnt = sim_dataset.filter(lambda example: example['score'] == -3,
                                  cache_file_name=data_path+'/bad_cache').num_rows
         print(f'**********There are {cnt} Bad Sentence!**********')
-        cnt = sim_dataset.filter(lambda example: example['score'] == -4,
-                                 cache_file_name=data_path+'/equal_cache').num_rows
-        print(f'**********There are {cnt} Equal Sentence!**********')
 
     if rank == 0 and config.cycle != -1:
         torch.distributed.barrier()
@@ -99,7 +93,7 @@ def load_data(config, rank, is_labeled=False, is_score=False, attri=None):
     else:
         if attri == 'dis':
             if is_score:
-                data_path = config.sim_data_path + '/trainD_cycle_{}'.format(config.cycle + 1)
+                data_path = config.sim_data_path + '/score_cycle_{}'.format(config.cycle + 1)
             else:
                 data_path = config.sim_data_path + '/trainD_cycle_{}'.format(config.cycle)
 

@@ -1,6 +1,5 @@
-import os
+from curses import raw
 import gc
-import random
 
 import torch
 import datasets
@@ -42,12 +41,12 @@ def multiply_pre_score(config, raw_dataset, rank):
                 batch['input_ids'].cuda(), None)
             all_logits.append(torch.softmax(logits, dim=1))
 
-        threshold0 = config.gen_threshold0 + (config.cycle + 1) * 0.04
-        if threshold0 > 0.9:
-            threshold0 = 0.9
-        threshold1 = config.gen_threshold1 + (config.cycle + 1) * 0.04
-        if threshold1 > 0.9:
-            threshold1 = 0.9
+        threshold0 = 0.9 - (config.cycle + 1) * 0.04
+        if threshold0 < config.gen_threshold0:
+            threshold0 = config.gen_threshold0
+        threshold1 = 0.9 - (config.cycle + 1) * 0.04
+        if threshold1 < config.gen_threshold1:
+            threshold1 = config.gen_threshold1
         all_logits = torch.cat(all_logits, dim=0)
         assert all_logits.size(0) == raw_dataset.num_rows
         
@@ -102,26 +101,45 @@ def gen_postprocess(output_dict, gen_tokenizer, config, rank):
         'text1': raw_text,
         'text2': sim_text,
     })
-
-    gen_ds_dict = multiply_pre_score(config, raw_dataset, rank)
-    gen_dataset = Dataset.from_dict(gen_ds_dict, features=feats)
-
+    
+    if rank > 0:
+        print(f'Rank {rank} waiting for main process to perform the spliting')
+        torch.distributed.barrier()
+    raw_dataset = raw_dataset.train_test_split(
+        test_size=0.5, seed=config.seed,
+        train_indices_cache_file_name=config.cache_data_path+'/split_cache_'+str(config.cycle))
+    score_ds, train_ds = raw_dataset['train'], raw_dataset['test']
     if rank == 0:
-        new_data_path = config.sim_data_path + f'/trainD_cycle_{config.cycle + 1}'
-        print(f'**********Generate Data Samples is {gen_dataset.num_rows}**********')
-        gen_dataset.save_to_disk(new_data_path)
-        print('**********Gen Data: done!!!**********')
+        new_data_path = config.sim_data_path + f'/score_cycle_{config.cycle + 1}'
+        print(f'**********Generate Data For Score Samples is {score_ds.num_rows}**********')
+        score_ds.save_to_disk(new_data_path)
+        torch.distributed.barrier()
+
+    if config.cycle >= 0:
+        gen_ds_dict = multiply_pre_score(config, train_ds, rank)
+        gen_dataset = Dataset.from_dict(gen_ds_dict, features=feats)
+
+        if rank == 0:
+            new_data_path = config.sim_data_path + f'/trainD_cycle_{config.cycle}'
+            print(f'**********Generate Data For TrainD Samples is {gen_dataset.num_rows}**********')
+            gen_dataset.save_to_disk(new_data_path)
+            print('**********Gen Data: done!!!**********')
 
 
 def dis_postprocess(dis_output_dict, config, rank):
     gc.collect()
     torch.cuda.empty_cache()
     
+    threshold = 0.9 - (config.cycle + 1) * 0.04
+    if threshold < config.dis_threshold:
+        threshold = config.dis_threshold
     if rank == 0:
-        print('**********Start to Post Process the Scored Data**********')
+        print(f'**********Start to Post Process the Scored Data, \
+            threshold is {threshold}**********')
+
     text1, text2, scores = [], [], []
     for idx, item in enumerate(dis_output_dict['logits']):
-        if item[1] >= config.dis_threshold:
+        if item[1] >= threshold:
             scores.append(1)
             text1.append(dis_output_dict['text1'][idx])
             text2.append(dis_output_dict['text2'][idx])
@@ -194,27 +212,20 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
         batch_size = config.pre_gen_bs
 
         test_ds = datasets.load_from_disk(config.test_sentence_path + config.data_name + '_sentence')
-        if config.data_name == 'chip':
-            start = config.data_num * 10000 % 60000
-            end = (config.data_num + 1) * 10000 % 60000
-        
-        elif config.data_name == 'qqp':
+        if config.data_name == 'qqp':
             start = config.data_num * 3000 % 9000
             end = (config.data_num + 1) * 3000 % 9000
         
-        elif config.data_name == 'oppo':
-            start = config.data_num * 7000 % 42000
-            end = (config.data_num + 1) * 7000 % 42000
-        
-        elif config.data_name == 'afqmc':
-            start = config.data_num * 10000 % 80000
-            end = (config.data_num + 1) * 10000 % 80000
+        else:
+            integer = int(test_ds.num_rows / 10000) * 10000
+            start = config.data_num * 20000 % integer
+            end = (config.data_num + 1) * 20000 % integer
 
         if end == 0:
             end = test_ds.num_rows
         sentence_ds = test_ds.select(range(start, end))
         if rank == 0:
-            print(f'**********The Test_ds Range is {start} ~~ {end}**********')
+            print(f'**********The Test_ds {integer} Range is {start} ~~ {end}**********')
 
         predict_dataset = SimGanDataset(sentence_ds)
 
