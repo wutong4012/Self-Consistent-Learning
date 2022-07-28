@@ -36,10 +36,10 @@ def generator_collate_fn(batch_data, tokenizer, real_batch_size, is_train):
     prompts_input_ids, lengths_input_ids, prompts_attention_mask = [], [], []
     for item in batch_data:
         if is_train:
-            text1 = tokenizer(item['text2'], return_tensors='pt').input_ids
-            noisy_text1 = noisy(x=text1, drop_prob=0.05, sub_prob=0.05, shuffle_dist=0, 
+            text2 = tokenizer(item['text2'], return_tensors='pt').input_ids
+            noisy_text2 = noisy(x=text2, drop_prob=0.05, sub_prob=0.05, shuffle_dist=0, 
                                 bos_token=50001, pad_token=50000, vocab_size=50176)
-            item['text2'] = tokenizer.decode(noisy_text1.squeeze(), skip_special_tokens=True)
+            item['text2'] = tokenizer.decode(noisy_text2.squeeze(), skip_special_tokens=True)
 
         # 反过来，让生成的文本作为text1, 原文本作为text2进行训练。
         prompt_text = '<bos>“' + item['text2'] + '”的相似句是“' + item['text1'] + '”'
@@ -48,11 +48,11 @@ def generator_collate_fn(batch_data, tokenizer, real_batch_size, is_train):
         if len(prompt) > 400:
             prompt = torch.cat([prompt[:399], torch.tensor([43432, 50000])])  # 截断后拼上”<eos>
         
-        # 由于sentence piece的原因，前面加“从而准确算出句子中text2_id的长度
-        text2_ids = tokenizer(
-            '“' + item['text2'] + '”', return_tensors='pt').input_ids.squeeze()[1:]
-        length = torch.tensor([1] * (len(prompt) - len(text2_ids)) + \
-            [len(text2_ids)] * len(text2_ids))
+        # 由于sentence piece的原因，前面加“从而准确算出句子中text1_id的长度
+        text1_ids = tokenizer(
+            '“' + item['text1'] + '”', return_tensors='pt').input_ids.squeeze()[1:]
+        length = torch.tensor([1] * (len(prompt) - len(text1_ids)) + \
+            [len(text1_ids)] * len(text1_ids))
     
         if len(prompt) <= max_length:
             max_length -= len(prompt)

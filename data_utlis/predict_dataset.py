@@ -106,8 +106,9 @@ def gen_postprocess(output_dict, gen_tokenizer, config, rank):
         print(f'Rank {rank} waiting for main process to perform the spliting')
         torch.distributed.barrier()
     raw_dataset = raw_dataset.train_test_split(
-        test_size=0.5, seed=config.seed,
-        train_indices_cache_file_name=config.cache_data_path+'/split_cache_'+str(config.cycle))
+        test_size=0.5, seed=config.seed+config.cycle,
+        train_indices_cache_file_name=config.cache_data_path+'/train_cache_'+str(config.cycle),
+        test_indices_cache_file_name=config.cache_data_path+'/test_cache_'+str(config.cycle))
     score_ds, train_ds = raw_dataset['train'], raw_dataset['test']
     if rank == 0:
         new_data_path = config.sim_data_path + f'/score_cycle_{config.cycle + 1}'
