@@ -1,5 +1,5 @@
-from curses import raw
 import gc
+from sklearn.model_selection import train_test_split
 
 import torch
 import datasets
@@ -41,12 +41,14 @@ def multiply_pre_score(config, raw_dataset, rank):
                 batch['input_ids'].cuda(), None)
             all_logits.append(torch.softmax(logits, dim=1))
 
-        threshold0 = 0.9 - (config.cycle + 1) * 0.04
-        if threshold0 < config.gen_threshold0:
-            threshold0 = config.gen_threshold0
-        threshold1 = 0.9 - (config.cycle + 1) * 0.04
-        if threshold1 < config.gen_threshold1:
-            threshold1 = config.gen_threshold1
+        # threshold0, threshold1 = 0.7, 0.7
+        threshold0 = config.min_thre0 + config.cycle * 0.04
+        if threshold0 > config.max_thre0:
+            threshold0 = config.max_thre0
+        threshold1 = config.min_thre1 + config.cycle * 0.04
+        if threshold1 > config.max_thre1:
+            threshold1 = config.max_thre1
+
         all_logits = torch.cat(all_logits, dim=0)
         assert all_logits.size(0) == raw_dataset.num_rows
         
@@ -64,8 +66,8 @@ def multiply_pre_score(config, raw_dataset, rank):
     if rank == 0:
         print(f'**********Origin Generate Data Samples is {raw_dataset.num_rows}**********')
         print(f'**********The Threshold 0 is {threshold0}**********')
-        print(f'**********There are {scores.count(0)} Samples to be Selected 0!**********')
         print(f'**********The Threshold 1 is {threshold1}**********')
+        print(f'**********There are {scores.count(0)} Samples to be Selected 0!**********')
         print(f'**********There are {scores.count(1)} Samples to be Selected 1!**********')
 
     return {
@@ -97,24 +99,20 @@ def gen_postprocess(output_dict, gen_tokenizer, config, rank):
 
     # ppl_list = torch.softmax(
     #     torch.tensor(real_ppl_list), dim=0).numpy().tolist()
+
     raw_dataset = Dataset.from_dict({
         'text1': raw_text,
         'text2': sim_text,
     })
-    
-    if rank > 0:
-        print(f'Rank {rank} waiting for main process to perform the spliting')
-        torch.distributed.barrier()
-    raw_dataset = raw_dataset.train_test_split(
-        test_size=0.5, seed=config.seed+config.cycle,
-        train_indices_cache_file_name=config.cache_data_path+'/train_cache_'+str(config.cycle),
-        test_indices_cache_file_name=config.cache_data_path+'/test_cache_'+str(config.cycle))
-    score_ds, train_ds = raw_dataset['train'], raw_dataset['test']
+    # dataset自带的train_test_split多卡时有bug
+    score_dict, train_dict = train_test_split(
+        raw_dataset, test_size=0.5, random_state=config.seed+config.cycle)
+    score_ds, train_ds = Dataset.from_dict(score_dict), Dataset.from_dict(train_dict)
+
     if rank == 0:
         new_data_path = config.sim_data_path + f'/score_cycle_{config.cycle + 1}'
         print(f'**********Generate Data For Score Samples is {score_ds.num_rows}**********')
         score_ds.save_to_disk(new_data_path)
-        torch.distributed.barrier()
 
     if config.cycle >= 0:
         gen_ds_dict = multiply_pre_score(config, train_ds, rank)
@@ -131,16 +129,17 @@ def dis_postprocess(dis_output_dict, config, rank):
     gc.collect()
     torch.cuda.empty_cache()
     
-    threshold = 0.9 - (config.cycle + 1) * 0.04
-    if threshold < config.dis_threshold:
-        threshold = config.dis_threshold
+    dis_threshold = 0.7
+    # dis_threshold = config.max_dis_thre - (config.cycle + 1) * 0.04
+    # if dis_threshold < config.min_dis_thre:
+    #     dis_threshold = config.min_dis_thre
     if rank == 0:
         print(f'**********Start to Post Process the Scored Data, \
-            threshold is {threshold}**********')
+            threshold is {dis_threshold}**********')
 
     text1, text2, scores = [], [], []
     for idx, item in enumerate(dis_output_dict['logits']):
-        if item[1] >= threshold:
+        if item[1] >= dis_threshold:
             scores.append(1)
             text1.append(dis_output_dict['text1'][idx])
             text2.append(dis_output_dict['text2'][idx])
