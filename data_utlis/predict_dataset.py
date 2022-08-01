@@ -205,6 +205,30 @@ def dis_pred_collate(batch_data, dis_tokenizer):
         'text2': text2,
         'input_ids': dis_input_ids,
     }
+    
+
+def process_gen_ds(config, rank):
+    gen_ds = datasets.load_from_disk(config.sim_data_path + f'/trainG_cycle_{config.cycle}')
+    gen_ds = gen_ds.select(range(6000))
+    
+    def process_gen(example):
+        sentence_list = []
+        for item in example['text2']:
+            if len(item) > 5:
+                sentence_list.append(item)
+        return {'sentence': sentence_list}
+    
+    if rank > 0:
+        print(f'Rank {rank} waiting for main process to perform the mapping')
+        torch.distributed.barrier()
+
+    gen_ds = gen_ds.map(process_gen, batch_size=500, batched=True,
+        cache_file_name=config.cache_data_path+'/gen_cache'+str(config.cycle))
+
+    if rank == 0:
+        torch.distributed.barrier()
+    
+    return gen_ds
 
 
 def create_predict_dataloader(config, tokenizer, rank, attri):
@@ -212,20 +236,19 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
         batch_size = config.pre_gen_bs
 
         test_ds = datasets.load_from_disk(config.test_sentence_path + config.data_name + '_sentence')
-        if config.data_name == 'qqp':
-            start = config.data_num * 3000 % 9000
-            end = (config.data_num + 1) * 3000 % 9000
-        
+        config.start = config.end
+        if config.cycle == -1:
+            config.end += 10000
         else:
-            integer = int(test_ds.num_rows / 10000) * 10000
-            start = config.data_num * 10000 % integer
-            end = (config.data_num + 1) * 10000 % integer
-
-        if end == 0:
-            end = test_ds.num_rows
-        sentence_ds = test_ds.select(range(start, end))
+            config.end += 5000
+        
+        if config.cycle < 0:
+            sentence_ds = test_ds.select(range(config.start, config.end))
+        else:
+            sentence_ds = datasets.concatenate_datasets(
+                [test_ds.select(range(config.start, config.end)), process_gen_ds(config, rank)])
         if rank == 0:
-            print(f'**********The Test_ds Range is {start} ~~ {end}**********')
+            print(f'**********The Test_ds Range is {config.start} ~~ {config.end}**********')
 
         predict_dataset = SimGanDataset(sentence_ds)
 

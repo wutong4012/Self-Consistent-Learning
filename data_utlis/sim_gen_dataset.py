@@ -59,17 +59,17 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
         torch.distributed.barrier()
 
     sim_dataset = sim_dataset.map(
-        process_equal, cache_file_name=data_path+'/map_cache')
+        process_equal, cache_file_name=data_path+'/map_cache'+str(config.cycle))
 
     if rank == 0:
-        cnt = sim_dataset.filter(lambda example: example['score'] == -1,
-                                 cache_file_name=data_path+'/short_cache').num_rows
+        cnt = sim_dataset.filter(lambda example: example['score'] == -1, 
+            cache_file_name=data_path+'/short_cache'+str(config.cycle)).num_rows
         print(f'**********There are {cnt} Short(<5) Sentence!**********')
         cnt = sim_dataset.filter(lambda example: example['score'] == -2,
-                                 cache_file_name=data_path+'/long_cache').num_rows
+            cache_file_name=data_path+'/long_cache'+str(config.cycle)).num_rows
         print(f'**********There are {cnt} Long(>50) Sentence!**********')
         cnt = sim_dataset.filter(lambda example: example['score'] == -3,
-                                 cache_file_name=data_path+'/bad_cache').num_rows
+            cache_file_name=data_path+'/bad_cache'+str(config.cycle)).num_rows
         print(f'**********There are {cnt} Bad Sentence!**********')
 
     if rank == 0 and config.cycle != -1:
@@ -81,8 +81,8 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
 def load_data(config, rank, is_labeled=False, is_score=False, attri=None):
     if is_labeled:
         sim_dataset = datasets.load_from_disk(
-            '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled4' + config.data_name)
-            # config.lab_data_path + config.data_name + '_train_ds')
+            # '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled4' + config.data_name)
+            config.lab_data_path + config.data_name + '_train_ds')  # fine-tune 
         if rank > 0:
             torch.distributed.barrier()
         sim_dataset = sim_dataset.shuffle(
@@ -106,7 +106,7 @@ def load_data(config, rank, is_labeled=False, is_score=False, attri=None):
         sim_dataset = datasets.load_from_disk(data_path)
 
         if attri == 'gen':
-            sim_dataset = preprocess_gen_data(config, rank, data_path, sim_dataset)
+            sim_dataset = preprocess_gen_data(config, rank, config.cache_data_path, sim_dataset)
 
     return sim_dataset
 
@@ -213,12 +213,12 @@ def set_dataset(config, use_label, use_gen, attri, rank):
 
     if config.pretrain_dis:
         train_data = datasets.load_from_disk(
-            '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled_train')
-            # config.lab_data_path + config.data_name + '_train_ds')
+            '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled_train_' + config.data_name)
+            # config.lab_data_path + config.data_name + '_train_ds')  # fine-tune
         train_dataset = SimGanDataset(data=train_data)
         test_data = datasets.load_from_disk(
-            '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled_test')
-            # config.test_data_path + config.data_name)
+            '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled_test_' + config.data_name)
+            # config.test_data_path + config.data_name)  # fine-tune
         val_dataset = SimGanDataset(data=test_data)
         
     else:

@@ -3,8 +3,8 @@ import csv, tqdm, jsonlines, glob, os
 from concurrent.futures import ProcessPoolExecutor
 
 
-_JSON_DATA_PATH = '/cognitive_comp/wutong/source/data_base/similarity_data/sim_json_data'
-_CACHE_DATA_PATH = '/cognitive_comp/wutong/source/data_base/similarity_data/sim_cache_data'
+_JSON_DATA_PATH = '/cognitive_comp/wutong/source/sim_data/similarity_data/sim_json_data'
+_CACHE_DATA_PATH = '/cognitive_comp/wutong/source/sim_data/similarity_data/sim_cache_data'
 _HUGGINGFACE_CACHE = '/cognitive_comp/wutong/source/data_base/huggingface-cache/'
 
 
@@ -84,52 +84,32 @@ class SimPairReader():
 
 class atec(SimPairReader):
     json_name_id = '0'
-    PATH = '/cognitive_comp/wutong/source/data_base/similarity_data/similar_raw_data/ATEC/ATEC.data'
-
-class atec_ccks(SimPairReader):
-    json_name_id = '1'
-    PATH = '/cognitive_comp/wutong/source/data_base/similarity_data/similar_raw_data/ATEC_CCKS/ATEC_CCKS.data'
+    PATH = '/cognitive_comp/wutong/source/sim_data/similarity_data/similar_raw_data/ATEC/ATEC.data'
 
 class bq(SimPairReader):
-    json_name_id = '2'
-    PATH = '/cognitive_comp/wutong/source/data_base/similarity_data/similar_raw_data/BQ/BQ.data'
+    json_name_id = '1'
+    PATH = '/cognitive_comp/wutong/source/sim_data/similarity_data/similar_raw_data/BQ/BQ.data'
 
 class ccks2018(SimPairReader):
-    json_name_id = '3'
-    PATH = '/cognitive_comp/wutong/source/data_base/similarity_data/similar_raw_data/CCKS_2018_3/CCKS_2018.data'
+    json_name_id = '2'
+    PATH = '/cognitive_comp/wutong/source/sim_data/similarity_data/similar_raw_data/CCKS_2018_3/CCKS_2018.data'
 
 class lcqmc(SimPairReader):
-    json_name_id = '4'
-    PATH = '/cognitive_comp/wutong/source/data_base/similarity_data/similar_raw_data/LCQMC/LCQMC.data'
+    json_name_id = '3'
+    PATH = '/cognitive_comp/wutong/source/sim_data/similarity_data/similar_raw_data/LCQMC/LCQMC.data'
 
 class pawsx(SimPairReader):
-    json_name_id = '5'
-    PATH = '/cognitive_comp/wutong/source/data_base/similarity_data/similar_raw_data/PAWSX/PAWSX.data'
+    json_name_id = '4'
+    PATH = '/cognitive_comp/wutong/source/sim_data/similarity_data/similar_raw_data/PAWSX/PAWSX.data'
 
 class sts_b(SimPairReader):
-    json_name_id = '6'
-    PATH = '/cognitive_comp/wutong/source/data_base/similarity_data/similar_raw_data/STS_B/STS_B.data'
+    json_name_id = '5'
+    PATH = '/cognitive_comp/wutong/source/sim_data/similarity_data/similar_raw_data/STS_B/STS_B.data'
 
     @classmethod
     def is_sim(cls, label):
         return int(label) >= 4
 
-class idea_anno(SimPairReader):
-    json_name_id = '7'
-    PATH = '/cognitive_comp/wutong/source/data_base/similarity_data/similar_raw_data/idea_anno/similar_stence_sep_4#.txt'
-
-    @classmethod
-    def split(cls, data):
-        return ''.join(data).split('|##|')
-
-class idea_anno2(SimPairReader):
-    json_name_id = '8'
-    PATH = '/cognitive_comp/wutong/source/data_base/similarity_data/similar_raw_data/idea_anno/20211125_20211201/20211125_20211201.txt'
-
-    @classmethod
-    def split(cls, data):
-        return ''.join(data).split('|##|')
-    
 
 feats = datasets.Features({"text1": datasets.Value('string'), 
                            "text2": datasets.Value('string'),
@@ -171,11 +151,10 @@ if __name__ == '__main__':
 
     named_corpora = {
         # 'atec': atec(),
-        # 'atec_ccks': atec_ccks(),
         "bq": bq(),
         "ccks2018": ccks2018(),
         "lcqmc": lcqmc(),
-        "pawsx": pawsx(),
+        # "pawsx": pawsx(),
         "sts_b": sts_b(),
     }
 
