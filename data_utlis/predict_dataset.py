@@ -41,7 +41,6 @@ def multiply_pre_score(config, raw_dataset, rank):
                 batch['input_ids'].cuda(), None)
             all_logits.append(torch.softmax(logits, dim=1))
 
-        # threshold0, threshold1 = 0.7, 0.7
         threshold0 = config.min_thre0 + config.cycle * 0.04
         if threshold0 > config.max_thre0:
             threshold0 = config.max_thre0
@@ -104,10 +103,12 @@ def gen_postprocess(output_dict, gen_tokenizer, config, rank):
         'text1': raw_text,
         'text2': sim_text,
     })
+    
     # dataset自带的train_test_split多卡时有bug
-    score_dict, train_dict = train_test_split(
-        raw_dataset, test_size=0.5, random_state=config.seed+config.cycle)
-    score_ds, train_ds = Dataset.from_dict(score_dict), Dataset.from_dict(train_dict)
+    # score_dict, train_dict = train_test_split(
+    #     raw_dataset, test_size=0.5, random_state=config.seed+config.cycle)
+    # score_ds, train_ds = Dataset.from_dict(score_dict), Dataset.from_dict(train_dict)
+    score_ds, train_ds = raw_dataset, raw_dataset
 
     if rank == 0:
         new_data_path = config.sim_data_path + f'/score_cycle_{config.cycle + 1}'
@@ -129,10 +130,9 @@ def dis_postprocess(dis_output_dict, config, rank):
     gc.collect()
     torch.cuda.empty_cache()
     
-    dis_threshold = 0.7
-    # dis_threshold = config.max_dis_thre - (config.cycle + 1) * 0.04
-    # if dis_threshold < config.min_dis_thre:
-    #     dis_threshold = config.min_dis_thre
+    dis_threshold = config.min_dis_thre + (config.cycle + 1) * 0.04
+    if dis_threshold > config.max_dis_thre:
+        dis_threshold = config.max_dis_thre
     if rank == 0:
         print(f'**********Start to Post Process the Scored Data, \
             threshold is {dis_threshold}**********')
@@ -218,14 +218,14 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
         
         else:
             integer = int(test_ds.num_rows / 10000) * 10000
-            start = config.data_num * 20000 % integer
-            end = (config.data_num + 1) * 20000 % integer
+            start = config.data_num * 10000 % integer
+            end = (config.data_num + 1) * 10000 % integer
 
         if end == 0:
             end = test_ds.num_rows
         sentence_ds = test_ds.select(range(start, end))
         if rank == 0:
-            print(f'**********The Test_ds {integer} Range is {start} ~~ {end}**********')
+            print(f'**********The Test_ds Range is {start} ~~ {end}**********')
 
         predict_dataset = SimGanDataset(sentence_ds)
 

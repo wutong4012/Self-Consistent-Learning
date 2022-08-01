@@ -30,6 +30,8 @@ class Discriminator(nn.Module):
                     pt_path = config.dis_model_path + '/roberta_oppo.pt'
                 elif config.data_name == 'afqmc':
                     pt_path = config.dis_model_path + '/roberta_afqmc.pt'
+                elif config.data_name == 'paws':
+                    pt_path = config.dis_model_path + '/roberta_paws.pt'
                 print(f'The warm up model path is {pt_path}!')
             else:
                 pt_path = config.ckpt_model_path + \

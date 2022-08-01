@@ -81,7 +81,8 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
 def load_data(config, rank, is_labeled=False, is_score=False, attri=None):
     if is_labeled:
         sim_dataset = datasets.load_from_disk(
-            config.lab_data_path + config.data_name + '_train_ds')
+            '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled4' + config.data_name)
+            # config.lab_data_path + config.data_name + '_train_ds')
         if rank > 0:
             torch.distributed.barrier()
         sim_dataset = sim_dataset.shuffle(
@@ -212,9 +213,12 @@ def set_dataset(config, use_label, use_gen, attri, rank):
 
     if config.pretrain_dis:
         train_data = datasets.load_from_disk(
-            config.lab_data_path + config.data_name + '_train_ds')
+            '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled_train')
+            # config.lab_data_path + config.data_name + '_train_ds')
         train_dataset = SimGanDataset(data=train_data)
-        test_data = datasets.load_from_disk(config.test_data_path + config.data_name)
+        test_data = datasets.load_from_disk(
+            '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled_test')
+            # config.test_data_path + config.data_name)
         val_dataset = SimGanDataset(data=test_data)
         
     else:
