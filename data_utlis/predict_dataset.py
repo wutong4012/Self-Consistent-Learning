@@ -26,7 +26,7 @@ def multiply_pre_score(config, raw_dataset, rank):
         return dis_pred_collate(batch_data, dis_tokenizer)
     dataloader = DataLoader(
         dataset=predict_dataset,
-        batch_size=128,
+        batch_size=384,
         shuffle=False,
         num_workers=8,
         pin_memory=True,
@@ -214,8 +214,7 @@ def process_gen_ds(config, rank):
     def process_gen(example):
         sentence_list = []
         for item in example['text2']:
-            if len(item) > 5:
-                sentence_list.append(item)
+            sentence_list.append(item)
         return {'sentence': sentence_list}
     
     if rank > 0:
@@ -237,10 +236,15 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
 
         test_ds = datasets.load_from_disk(config.test_sentence_path + config.data_name + '_sentence')
         config.start = config.end
+        if config.start == test_ds.num_rows:
+            config.start = config.end = 0
+
         if config.cycle == -1:
             config.end += 10000
         else:
             config.end += 5000
+        if config.end > test_ds.num_rows:
+            config.end = test_ds.num_rows
         
         if config.cycle < 0:
             sentence_ds = test_ds.select(range(config.start, config.end))
