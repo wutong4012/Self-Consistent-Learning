@@ -1,4 +1,5 @@
 import gc
+import requests
 from sklearn.model_selection import train_test_split
 
 import torch
@@ -41,12 +42,12 @@ def multiply_pre_score(config, raw_dataset, rank):
                 batch['input_ids'].cuda(), None)
             all_logits.append(torch.softmax(logits, dim=1))
 
-        threshold0 = config.min_thre0 + config.cycle * 0.04
-        if threshold0 > config.max_thre0:
-            threshold0 = config.max_thre0
-        threshold1 = config.min_thre1 + config.cycle * 0.04
-        if threshold1 > config.max_thre1:
-            threshold1 = config.max_thre1
+        threshold0 = config.max_thre0 - config.cycle * 0.04
+        if threshold0 < config.min_thre0:
+            threshold0 = config.min_thre0
+        threshold1 = config.max_thre1 - config.cycle * 0.04
+        if threshold1 < config.min_thre1:
+            threshold1 = config.min_thre1
 
         all_logits = torch.cat(all_logits, dim=0)
         assert all_logits.size(0) == raw_dataset.num_rows
@@ -130,9 +131,9 @@ def dis_postprocess(dis_output_dict, config, rank):
     gc.collect()
     torch.cuda.empty_cache()
     
-    dis_threshold = config.min_dis_thre + (config.cycle + 1) * 0.04
-    if dis_threshold > config.max_dis_thre:
-        dis_threshold = config.max_dis_thre
+    dis_threshold = config.max_dis_thre - (config.cycle + 1) * 0.04
+    if dis_threshold < config.min_dis_thre:
+        dis_threshold = config.min_dis_thre
     if rank == 0:
         print(f'**********Start to Post Process the Scored Data, \
             threshold is {dis_threshold}**********')
@@ -205,29 +206,53 @@ def dis_pred_collate(batch_data, dis_tokenizer):
         'text2': text2,
         'input_ids': dis_input_ids,
     }
-    
 
-def process_gen_ds(config, rank):
-    gen_ds = datasets.load_from_disk(config.sim_data_path + f'/trainG_cycle_{config.cycle}')
-    gen_ds = gen_ds.select(range(6000))
-    
-    def process_gen(example):
-        sentence_list = []
-        for item in example['text2']:
-            sentence_list.append(item)
-        return {'sentence': sentence_list}
-    
-    if rank > 0:
-        print(f'Rank {rank} waiting for main process to perform the mapping')
-        torch.distributed.barrier()
 
-    gen_ds = gen_ds.map(process_gen, batch_size=500, batched=True,
-        cache_file_name=config.cache_data_path+'/gen_cache'+str(config.cycle))
-
-    if rank == 0:
-        torch.distributed.barrier()
+def get_vae_sent(config, origin_ds):
+    sents_list = []
+    for idx in range(origin_ds.num_rows):
+        sents_list.append(origin_ds[idx]['sentence'])
     
-    return gen_ds
+    url="http://192.168.52.173:23628/davae"
+    result = requests.post(url,
+                json={
+                    'sent_inputs': sents_list,
+                    'top_p': 0.95,
+                    'std_scale': 1.5,
+                    'augm_num':1
+                }
+            ).json()
+    
+    vae_ds = Dataset.from_dict(
+        {'sentence': result['generated_sentence']}
+    )
+    vae_ds.save_to_disk(config.test_sentence_path + 'vae_sentence/sent_' + str(config.cycle))
+
+
+# def process_gen_ds(config, rank):
+#     """
+#         使用Generator生成的句子再作为预测的输入句子
+#     """
+#     gen_ds = datasets.load_from_disk(config.sim_data_path + f'/trainG_cycle_{config.cycle}')
+#     gen_ds = gen_ds.select(range(6000))
+    
+#     def process_gen(example):
+#         sentence_list = []
+#         for item in example['text2']:
+#             sentence_list.append(item)
+#         return {'sentence': sentence_list}
+    
+#     if rank > 0:
+#         print(f'Rank {rank} waiting for main process to perform the mapping')
+#         torch.distributed.barrier()
+
+#     gen_ds = gen_ds.map(process_gen, batch_size=500, batched=True,
+#         cache_file_name=config.cache_data_path+'/gen_cache'+str(config.cycle))
+
+#     if rank == 0:
+#         torch.distributed.barrier()
+    
+#     return gen_ds
 
 
 def create_predict_dataloader(config, tokenizer, rank, attri):
@@ -236,21 +261,20 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
 
         test_ds = datasets.load_from_disk(config.test_sentence_path + config.data_name + '_sentence')
         config.start = config.end
+        config.end += 5000
         if config.start == test_ds.num_rows:
             config.start = config.end = 0
-
-        if config.cycle == -1:
-            config.end += 10000
-        else:
-            config.end += 5000
         if config.end > test_ds.num_rows:
             config.end = test_ds.num_rows
-        
-        if config.cycle < 0:
-            sentence_ds = test_ds.select(range(config.start, config.end))
-        else:
-            sentence_ds = datasets.concatenate_datasets(
-                [test_ds.select(range(config.start, config.end)), process_gen_ds(config, rank)])
+            
+        origin_ds = test_ds.select(range(config.start, config.end))
+        if rank == 0:
+            print('Starting use VAE server...')
+            get_vae_sent(config, origin_ds)
+            print('Generate Senteces Finished!')
+        torch.distributed.barrier()
+        vae_ds = datasets.load_from_disk(config.test_sentence_path + 'vae_sentence/sent_' + str(config.cycle))
+        sentence_ds = datasets.concatenate_datasets([origin_ds, vae_ds])
         if rank == 0:
             print(f'**********The Test_ds Range is {config.start} ~~ {config.end}**********')
 
