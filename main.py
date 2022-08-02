@@ -107,6 +107,10 @@ def run(config):
     torch.backends.cudnn.benchmark = True
     seed_everything(config.seed)
     
+    config.ckpt_model_path += str(config.idx)
+    config.sim_data_path += str(config.idx)
+    config.cache_data_path += str(config.idx)
+    
     for idx in range(config.cycle, config.cycle_num):
         config.cycle = idx
         print('**********Cycle: {}**********'.format(config.cycle))

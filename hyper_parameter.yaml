@@ -10,21 +10,21 @@ test_sentence_path: /cognitive_comp/wutong/source/sim_data/predict_sentences/
 test_data_path: /cognitive_comp/wutong/source/sim_data/sim_test_data/
 lab_data_path: /cognitive_comp/wutong/source/sim_data/sim_train_data/
 
-# 需要修改文件名
-ckpt_model_path: /cognitive_comp/wutong/similarity_generation/experiments/lightning_logs/checkpoints  ## 
-sim_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_data  ##
-cache_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_cache  ##
+ckpt_model_path: /cognitive_comp/wutong/similarity_generation/experiments/lightning_logs/checkpoints/
+sim_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_data/
+cache_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_cache/
 
+std_scale: 1.2
 top_k: 0
 top_p: 0.95
 repetition_penalty: 1.0
 
-max_thre0: 0.7
-min_thre0: 0.7
-max_thre1: 0.7
-min_thre1: 0.7
-max_dis_thre: 0.7
-min_dis_thre: 0.7
+max_thre0: 0.6
+min_thre0: 0.6
+max_thre1: 0.6
+min_thre1: 0.6
+max_dis_thre: 0.6
+min_dis_thre: 0.6
 
 gen_repeat_times: 1  # 每条句子重复生成的次数
 dis_batch_size: 128  # 128 / 384
@@ -33,6 +33,7 @@ gen_big_batch_size: 30
 pre_gen_bs: 512  # 生成样本的batch size
 pre_dis_bs: 1024
 
+reset_vae: True
 warm_up_model: True  ####
 pretrain_dis: False  ####
 dis_hidden_size: 1024
@@ -40,11 +41,13 @@ discriminator: hfl/chinese-roberta-wwm-ext-large ##
 # hfl/chinese-roberta-wwm-ext-large / IDEA-CCNL/Erlangshen-Roberta-330M-Similarity
 
 learning_rate: 2e-5
-cycle_num: 50  ####
+cycle_num: 10  ####
 cycle: -1  ####
+idx: 0
 data_num: -1
 start: 0 
 end: 0
+sentence_num: 8000
 
 gen_train_steps: 200
 dis_train_steps: 200  ####

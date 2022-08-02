@@ -43,10 +43,10 @@ def multiply_pre_score(config, raw_dataset, rank):
                 batch['input_ids'].cuda(), None)
             all_logits.append(torch.softmax(logits, dim=1))
 
-        threshold0 = config.min_thre0 + config.cycle * 0.04
+        threshold0 = config.min_thre0 + config.cycle * 0.02
         if threshold0 > config.max_thre0:
             threshold0 = config.max_thre0
-        threshold1 = config.min_thre1 + config.cycle * 0.04
+        threshold1 = config.min_thre1 + config.cycle * 0.02
         if threshold1 > config.max_thre1:
             threshold1 = config.max_thre1
 
@@ -132,7 +132,7 @@ def dis_postprocess(dis_output_dict, config, rank):
     gc.collect()
     torch.cuda.empty_cache()
     
-    dis_threshold = config.min_dis_thre + (config.cycle + 1) * 0.04
+    dis_threshold = config.min_dis_thre + (config.cycle + 1) * 0.02
     if dis_threshold > config.max_dis_thre:
         dis_threshold = config.max_dis_thre
     if rank == 0:
@@ -212,7 +212,8 @@ def dis_pred_collate(batch_data, dis_tokenizer):
 def get_vae_sent(config, origin_ds, vae_path):
     sents_list = []
     for idx in range(origin_ds.num_rows):
-        sents_list.append(origin_ds[idx]['sentence'])
+        if len(origin_ds[idx]['sentence']) >= 10:
+            sents_list.append(origin_ds[idx]['sentence'])
     
     url="http://192.168.52.173:23628/davae"
     result = requests.post(url,
@@ -228,6 +229,7 @@ def get_vae_sent(config, origin_ds, vae_path):
         {'sentence': result['generated_sentence']}
     )
     vae_ds.save_to_disk(vae_path)
+    print(f'**********vae sent_num is {vae_ds.num_rows}**********')
 
 
 # def process_gen_ds(config, rank):
@@ -262,7 +264,7 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
 
         test_ds = datasets.load_from_disk(config.test_sentence_path + config.data_name + '_sentence')
         config.start = config.end
-        config.end += 5000
+        config.end += config.sentence_num
         if config.start == test_ds.num_rows:
             config.start = config.end = 0
         if config.end > test_ds.num_rows:
@@ -272,6 +274,7 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
         vae_path = config.test_sentence_path + 'vae_sentence/sent_' + str(config.cycle)
         if rank == 0 and ((not os.path.exists(vae_path)) or config.reset_vae):
             print('**********Starting use VAE server...**********')
+            print(f'**********std_scale is {config.std_scale}**********')
             get_vae_sent(config, origin_ds, vae_path)
             print('**********Generate Senteces Finished!**********')
         torch.distributed.barrier()
