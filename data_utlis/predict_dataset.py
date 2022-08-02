@@ -1,3 +1,4 @@
+import os
 import gc
 import requests
 from sklearn.model_selection import train_test_split
@@ -42,12 +43,12 @@ def multiply_pre_score(config, raw_dataset, rank):
                 batch['input_ids'].cuda(), None)
             all_logits.append(torch.softmax(logits, dim=1))
 
-        threshold0 = config.max_thre0 - config.cycle * 0.04
-        if threshold0 < config.min_thre0:
-            threshold0 = config.min_thre0
-        threshold1 = config.max_thre1 - config.cycle * 0.04
-        if threshold1 < config.min_thre1:
-            threshold1 = config.min_thre1
+        threshold0 = config.min_thre0 + config.cycle * 0.04
+        if threshold0 > config.max_thre0:
+            threshold0 = config.max_thre0
+        threshold1 = config.min_thre1 + config.cycle * 0.04
+        if threshold1 > config.max_thre1:
+            threshold1 = config.max_thre1
 
         all_logits = torch.cat(all_logits, dim=0)
         assert all_logits.size(0) == raw_dataset.num_rows
@@ -131,9 +132,9 @@ def dis_postprocess(dis_output_dict, config, rank):
     gc.collect()
     torch.cuda.empty_cache()
     
-    dis_threshold = config.max_dis_thre - (config.cycle + 1) * 0.04
-    if dis_threshold < config.min_dis_thre:
-        dis_threshold = config.min_dis_thre
+    dis_threshold = config.min_dis_thre + (config.cycle + 1) * 0.04
+    if dis_threshold > config.max_dis_thre:
+        dis_threshold = config.max_dis_thre
     if rank == 0:
         print(f'**********Start to Post Process the Scored Data, \
             threshold is {dis_threshold}**********')
@@ -208,7 +209,7 @@ def dis_pred_collate(batch_data, dis_tokenizer):
     }
 
 
-def get_vae_sent(config, origin_ds):
+def get_vae_sent(config, origin_ds, vae_path):
     sents_list = []
     for idx in range(origin_ds.num_rows):
         sents_list.append(origin_ds[idx]['sentence'])
@@ -218,7 +219,7 @@ def get_vae_sent(config, origin_ds):
                 json={
                     'sent_inputs': sents_list,
                     'top_p': 0.95,
-                    'std_scale': 1.5,
+                    'std_scale': config.std_scale,
                     'augm_num':1
                 }
             ).json()
@@ -226,7 +227,7 @@ def get_vae_sent(config, origin_ds):
     vae_ds = Dataset.from_dict(
         {'sentence': result['generated_sentence']}
     )
-    vae_ds.save_to_disk(config.test_sentence_path + 'vae_sentence/sent_' + str(config.cycle))
+    vae_ds.save_to_disk(vae_path)
 
 
 # def process_gen_ds(config, rank):
@@ -268,12 +269,13 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
             config.end = test_ds.num_rows
             
         origin_ds = test_ds.select(range(config.start, config.end))
-        if rank == 0:
-            print('Starting use VAE server...')
-            get_vae_sent(config, origin_ds)
-            print('Generate Senteces Finished!')
+        vae_path = config.test_sentence_path + 'vae_sentence/sent_' + str(config.cycle)
+        if rank == 0 and ((not os.path.exists(vae_path)) or config.reset_vae):
+            print('**********Starting use VAE server...**********')
+            get_vae_sent(config, origin_ds, vae_path)
+            print('**********Generate Senteces Finished!**********')
         torch.distributed.barrier()
-        vae_ds = datasets.load_from_disk(config.test_sentence_path + 'vae_sentence/sent_' + str(config.cycle))
+        vae_ds = datasets.load_from_disk(vae_path)
         sentence_ds = datasets.concatenate_datasets([origin_ds, vae_ds])
         if rank == 0:
             print(f'**********The Test_ds Range is {config.start} ~~ {config.end}**********')
