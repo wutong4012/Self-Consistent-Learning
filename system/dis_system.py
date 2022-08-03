@@ -25,7 +25,7 @@ class DisSystem(LightningModule):
 
     def _set_tokenizers_and_models(self):
         self.dis_tokenizer = BertTokenizer.from_pretrained(
-            self.config.discriminator)
+            self.config.dis_model_path + self.config.discriminator)
         self.discriminator = Discriminator(self.config)
 
     def train_dataloader(self):

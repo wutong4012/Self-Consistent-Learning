@@ -14,7 +14,7 @@ class Discriminator(nn.Module):
         super().__init__()
 
         self.dis = BertForSequenceClassification.from_pretrained(
-            config.discriminator, num_labels=2)
+            config.dis_model_path + config.discriminator, num_labels=2)
         
         if config.pretrain_dis and not config.warm_up_model:
             return
@@ -23,15 +23,15 @@ class Discriminator(nn.Module):
             print('Use Warm Up Model...')
             if config.cycle == 0 or config.cycle == -1:
                 if config.data_name == 'chip':
-                    pt_path = config.dis_model_path + '/roberta_chip.pt'
+                    pt_path = config.dis_model_path + 'roberta_chip.pt'
                 elif config.data_name == 'qqp':
-                    pt_path = config.dis_model_path + '/els_qqp.pt'
+                    pt_path = config.dis_model_path + 'els_qqp.pt'
                 elif config.data_name == 'oppo':
-                    pt_path = config.dis_model_path + '/roberta_oppo.pt'
+                    pt_path = config.dis_model_path + 'roberta_oppo.pt'
                 elif config.data_name == 'afqmc':
-                    pt_path = config.dis_model_path + '/roberta_afqmc.pt'
+                    pt_path = config.dis_model_path + 'roberta_afqmc.pt'
                 elif config.data_name == 'paws':
-                    pt_path = config.dis_model_path + '/roberta_paws.pt'
+                    pt_path = config.dis_model_path + 'roberta_paws.pt'
                 print(f'The warm up model path is {pt_path}!')
             else:
                 pt_path = config.ckpt_model_path + \
