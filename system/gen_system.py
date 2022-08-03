@@ -20,8 +20,8 @@ class GenSystem(LightningModule):
 
     def set_gen_dataset(self):
         self.train_dataset, self.val_dataset = \
-            set_dataset(self.config, use_label=True, use_gen=True,
-                        attri='gen', rank=self.global_rank)
+            set_dataset(self.config, use_label=True, 
+                        use_gen=True, attri='gen', rank=self.global_rank)
 
     def _set_tokenizers_and_models(self):
         self.gen_tokenizer = T5Tokenizer.from_pretrained(

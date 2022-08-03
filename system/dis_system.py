@@ -20,8 +20,8 @@ class DisSystem(LightningModule):
 
     def set_dis_dataset(self):
         self.train_dataset, self.val_dataset = \
-            set_dataset(self.config, use_label=True, use_gen=True,
-                        attri='dis', rank=self.global_rank)
+            set_dataset(self.config, use_label=self.config.dis_use_label,
+                        use_gen=True, attri='dis', rank=self.global_rank)
 
     def _set_tokenizers_and_models(self):
         self.dis_tokenizer = BertTokenizer.from_pretrained(

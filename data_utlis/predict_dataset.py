@@ -43,10 +43,10 @@ def multiply_pre_score(config, raw_dataset, rank):
                 batch['input_ids'].cuda(), None)
             all_logits.append(torch.softmax(logits, dim=1))
 
-        threshold0 = config.min_thre0 + config.cycle * 0.02
+        threshold0 = config.min_thre0 + config.cycle * 0.04
         if threshold0 > config.max_thre0:
             threshold0 = config.max_thre0
-        threshold1 = config.min_thre1 + config.cycle * 0.02
+        threshold1 = config.min_thre1 + config.cycle * 0.04
         if threshold1 > config.max_thre1:
             threshold1 = config.max_thre1
 
@@ -132,7 +132,7 @@ def dis_postprocess(dis_output_dict, config, rank):
     gc.collect()
     torch.cuda.empty_cache()
     
-    dis_threshold = config.min_dis_thre + (config.cycle + 1) * 0.02
+    dis_threshold = config.min_dis_thre + (config.cycle + 1) * 0.04
     if dis_threshold > config.max_dis_thre:
         dis_threshold = config.max_dis_thre
     if rank == 0:
