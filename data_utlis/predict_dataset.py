@@ -212,8 +212,8 @@ def dis_pred_collate(batch_data, dis_tokenizer):
 def get_vae_sent(config, origin_ds, vae_path):
     sents_list = []
     for idx in range(origin_ds.num_rows):
-        if len(origin_ds[idx]['sentence']) >= 10:
-            sents_list.append(origin_ds[idx]['sentence'])
+        # if len(origin_ds[idx]['sentence']) >= 10:
+        sents_list.append(origin_ds[idx]['sentence'])
     
     url="http://192.168.52.173:23628/davae"
     result = requests.post(url,

@@ -1,3 +1,4 @@
+import os
 import gc
 import hydra
 from collections import defaultdict
@@ -110,6 +111,8 @@ def run(config):
     config.ckpt_model_path += str(config.idx)
     config.sim_data_path += str(config.idx)
     config.cache_data_path += str(config.idx)
+    if not os.path.exists(config.cache_data_path):
+        os.mkdir(config.cache_data_path)
     
     for idx in range(config.cycle, config.cycle_num):
         config.cycle = idx
