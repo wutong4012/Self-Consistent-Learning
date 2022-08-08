@@ -81,8 +81,8 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
 def load_data(config, rank, is_labeled=False, is_score=False, attri=None):
     if is_labeled:
         sim_dataset = datasets.load_from_disk(
-            # '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled4' + config.data_name)
-            config.lab_data_path + config.data_name + '_train_ds')  # fine-tune 
+            '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled4' + config.data_name)
+            # config.lab_data_path + config.data_name + '_train_ds')  # fine-tune 
         if rank > 0:
             torch.distributed.barrier()
         sim_dataset = sim_dataset.shuffle(
@@ -216,7 +216,10 @@ def set_dataset(config, use_label, use_gen, attri, rank):
         elif use_gen and use_label:
             labeled_data = load_data(config, rank, is_labeled=True)
             generated_data = load_data(config, rank, is_labeled=False, attri=attri)
-            part_labeled_data = labeled_data.select(range(generated_data.num_rows))
+            if generated_data.num_rows <= labeled_data.num_rows:
+                part_labeled_data = labeled_data.select(range(generated_data.num_rows))
+            else:
+                part_labeled_data =labeled_data
 
             if rank == 0:
                 random_list = random.sample(range(part_labeled_data.num_rows), 10)
@@ -236,12 +239,12 @@ def set_dataset(config, use_label, use_gen, attri, rank):
 
     if config.pretrain_dis:
         train_data = datasets.load_from_disk(
-            '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled_train_' + config.data_name)
-            # config.lab_data_path + config.data_name + '_train_ds')  # fine-tune
+            # '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled_train_' + config.data_name)
+            config.lab_data_path + config.data_name + '_train_ds')  # fine-tune
         train_dataset = SimGanDataset(data=train_data)
         test_data = datasets.load_from_disk(
-            '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled_test_' + config.data_name)
-            # config.test_data_path + config.data_name)  # fine-tune
+            # '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled_test_' + config.data_name)
+            config.test_data_path + config.data_name)  # fine-tune
         val_dataset = SimGanDataset(data=test_data)
         
     else:

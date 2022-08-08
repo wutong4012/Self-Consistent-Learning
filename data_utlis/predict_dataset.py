@@ -20,7 +20,8 @@ feats = datasets.Features({"text1": datasets.Value('string'),
 
 
 def multiply_pre_score(config, raw_dataset, rank):
-    dis_tokenizer = BertTokenizer.from_pretrained(config.discriminator)
+    dis_tokenizer = BertTokenizer.from_pretrained(
+        config.dis_model_path + config.discriminator)
     discriminator = Discriminator(config).cuda().eval()
     
     predict_dataset = SimGanDataset(raw_dataset)
@@ -43,10 +44,10 @@ def multiply_pre_score(config, raw_dataset, rank):
                 batch['input_ids'].cuda(), None)
             all_logits.append(torch.softmax(logits, dim=1))
 
-        threshold0 = config.min_thre0 + config.cycle * 0.04
+        threshold0 = config.min_thre0 + config.cycle * 0.07
         if threshold0 > config.max_thre0:
             threshold0 = config.max_thre0
-        threshold1 = config.min_thre1 + config.cycle * 0.04
+        threshold1 = config.min_thre1 + config.cycle * 0.07
         if threshold1 > config.max_thre1:
             threshold1 = config.max_thre1
 
@@ -132,7 +133,7 @@ def dis_postprocess(dis_output_dict, config, rank):
     gc.collect()
     torch.cuda.empty_cache()
     
-    dis_threshold = config.min_dis_thre + (config.cycle + 1) * 0.04
+    dis_threshold = config.min_dis_thre + (config.cycle + 1) * 0.07
     if dis_threshold > config.max_dis_thre:
         dis_threshold = config.max_dis_thre
     if rank == 0:
@@ -232,30 +233,31 @@ def get_vae_sent(config, origin_ds, vae_path):
     print(f'**********vae sent_num is {vae_ds.num_rows}**********')
 
 
-# def process_gen_ds(config, rank):
-#     """
-#         使用Generator生成的句子再作为预测的输入句子
-#     """
-#     gen_ds = datasets.load_from_disk(config.sim_data_path + f'/trainG_cycle_{config.cycle}')
-#     gen_ds = gen_ds.select(range(6000))
+def process_gen_ds(config, rank):
+    """
+        使用Generator生成的句子再作为预测的输入句子
+    """
+    gen_ds = datasets.load_from_disk(config.sim_data_path + f'/trainG_cycle_{config.cycle}')
+    if gen_ds.num_rows > 6000:
+        gen_ds = gen_ds.select(range(6000))
     
-#     def process_gen(example):
-#         sentence_list = []
-#         for item in example['text2']:
-#             sentence_list.append(item)
-#         return {'sentence': sentence_list}
+    def process_gen(example):
+        sentence_list = []
+        for item in example['text2']:
+            sentence_list.append(item)
+        return {'sentence': sentence_list}
     
-#     if rank > 0:
-#         print(f'Rank {rank} waiting for main process to perform the mapping')
-#         torch.distributed.barrier()
+    if rank > 0:
+        print(f'Rank {rank} waiting for main process to perform the mapping')
+        torch.distributed.barrier()
 
-#     gen_ds = gen_ds.map(process_gen, batch_size=500, batched=True,
-#         cache_file_name=config.cache_data_path+'/gen_cache'+str(config.cycle))
+    gen_ds = gen_ds.map(process_gen, batch_size=500, batched=True,
+        cache_file_name=config.cache_data_path+'/gen_cache'+str(config.cycle))
 
-#     if rank == 0:
-#         torch.distributed.barrier()
+    if rank == 0:
+        torch.distributed.barrier()
     
-#     return gen_ds
+    return gen_ds
 
 
 def create_predict_dataloader(config, tokenizer, rank, attri):
@@ -269,19 +271,26 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
             config.start = config.end = 0
         if config.end > test_ds.num_rows:
             config.end = test_ds.num_rows
-            
-        origin_ds = test_ds.select(range(config.start, config.end))
-        vae_path = config.test_sentence_path + 'vae_sentence/sent_' + str(config.cycle)
-        if rank == 0 and ((not os.path.exists(vae_path)) or config.reset_vae):
-            print('**********Starting use VAE server...**********')
-            print(f'**********std_scale is {config.std_scale}**********')
-            get_vae_sent(config, origin_ds, vae_path)
-            print('**********Generate Senteces Finished!**********')
-        torch.distributed.barrier()
-        vae_ds = datasets.load_from_disk(vae_path)
-        sentence_ds = datasets.concatenate_datasets([origin_ds, vae_ds])
         if rank == 0:
             print(f'**********The Test_ds Range is {config.start} ~~ {config.end}**********')
+            
+        origin_ds = test_ds.select(range(config.start, config.end))
+        if config.vae2gen:
+            vae_path = config.test_sentence_path + 'vae_sentence/' + str(config.idx) + '/sent_' + str(config.cycle)
+            if rank == 0 and (not os.path.exists(vae_path)):
+                print('**********Starting use VAE server...**********')
+                print(f'**********std_scale is {config.std_scale}**********')
+                get_vae_sent(config, origin_ds, vae_path)
+                print('**********Generate Senteces Finished!**********')
+            torch.distributed.barrier()
+            extra_ds = datasets.load_from_disk(vae_path)
+        elif config.txl2gen:
+            if config.cycle == -1:
+                sentence_ds = test_ds.select(range(0, 10000))
+            else:
+                extra_ds = process_gen_ds(config, rank)
+        if (config.txl2gen and config.cycle != -1) or config.vae2gen:
+            sentence_ds = datasets.concatenate_datasets([origin_ds, extra_ds])
 
         predict_dataset = SimGanDataset(sentence_ds)
 

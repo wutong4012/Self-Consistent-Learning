@@ -154,7 +154,7 @@ if __name__ == '__main__':
         "bq": bq(),
         "ccks2018": ccks2018(),
         "lcqmc": lcqmc(),
-        # "pawsx": pawsx(),
+        "pawsx": pawsx(),
         "sts_b": sts_b(),
     }
 

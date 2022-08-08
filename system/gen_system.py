@@ -53,7 +53,6 @@ class GenSystem(LightningModule):
             print('**********Start to Prepare the Predict Dataloader**********')
             print(f'**********The Top-P is {self.config.top_p}**********')
             print(f'**********The Repetition Penalty is {self.config.repetition_penalty}**********')
-        self.config.data_num += 1
         return create_predict_dataloader(config=self.config, tokenizer=self.gen_tokenizer,
                                          rank=self.global_rank, attri='gen')
 
