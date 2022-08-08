@@ -22,7 +22,10 @@ class Discriminator(nn.Module):
         if config.warm_up_model:
             print('Use Warm Up Model...')
             if config.cycle == 0 or config.cycle == -1:
-                pt_path = config.dis_model_path + 'roberta_' + config.data_name + '0.pt'
+                if config.zero_shot == 1:
+                    pt_path = config.dis_model_path + 'roberta_' + config.data_name + '0.pt'
+                else:
+                    pt_path = config.dis_model_path + 'roberta_' + config.data_name + '.pt'
                 print(f'The warm up model path is {pt_path}!')
             else:
                 pt_path = config.ckpt_model_path + \
