@@ -266,13 +266,11 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
 
         test_ds = datasets.load_from_disk(config.test_sentence_path + config.data_name + '_sentence')
         config.start = config.end
-        config.end += config.sentence_num
         if config.start == test_ds.num_rows:
             config.start = config.end = 0
+        config.end += config.sentence_num
         if config.end > test_ds.num_rows:
             config.end = test_ds.num_rows
-        if rank == 0:
-            print(f'**********The Test_ds Range is {config.start} ~~ {config.end}**********')
             
         origin_ds = test_ds.select(range(config.start, config.end))
         if config.vae2gen:
@@ -286,11 +284,14 @@ def create_predict_dataloader(config, tokenizer, rank, attri):
             extra_ds = datasets.load_from_disk(vae_path)
         elif config.txl2gen:
             if config.cycle == -1:
-                sentence_ds = test_ds.select(range(0, 10000))
+                sentence_ds = test_ds.select(range(0, config.sentence_num*2))
+                config.end = config.sentence_num * 2
             else:
                 extra_ds = process_gen_ds(config, rank)
         if (config.txl2gen and config.cycle != -1) or config.vae2gen:
             sentence_ds = datasets.concatenate_datasets([origin_ds, extra_ds])
+        if rank == 0:
+            print(f'**********The Test_ds Range is {config.start} ~~ {config.end}**********')
 
         predict_dataset = SimGanDataset(sentence_ds)
 
