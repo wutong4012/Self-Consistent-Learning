@@ -41,14 +41,13 @@ def generator_collate_fn(batch_data, tokenizer, real_batch_size, is_train):
                                 bos_token=50001, pad_token=50000, vocab_size=50176)
             item['text1'] = tokenizer.decode(noisy_text1.squeeze(), skip_special_tokens=True)
 
-        # 反过来，让生成的文本作为text1, 原文本作为text2进行训练。
         prompt_text = '<bos>“' + item['text1'] + '”的相似句是“' + item['text2'] + '”'
         prompt = tokenizer(
             prompt_text.replace(' ', ''), return_tensors='pt').input_ids.squeeze()
         if len(prompt) > 400:
             prompt = torch.cat([prompt[:399], torch.tensor([43432, 50000])])  # 截断后拼上”<eos>
         
-        # 由于sentence piece的原因，前面加“从而准确算出句子中text1_id的长度
+        # 由于sentence piece的原因，前面加“从而准确算出句子中text2_id的长度
         text2_ids = tokenizer(
             '“' + item['text2'] + '”', return_tensors='pt').input_ids.squeeze()[1:]
         length = torch.tensor([1] * (len(prompt) - len(text2_ids)) + \
@@ -91,7 +90,7 @@ def generator_collate_fn(batch_data, tokenizer, real_batch_size, is_train):
     prompts_input_ids = pad_sequence([x for x in prompts_input_ids],
                                      batch_first=True, padding_value=50000)  # eos_token_id is 50000
     lengths_input_ids = pad_sequence([x for x in lengths_input_ids], 
-                                    batch_first=True, padding_value=50000)
+                                     batch_first=True, padding_value=1)
 
     max_seq_length = max(pam.size(0) for pam in prompts_attention_mask)
     prompts_attention_mask = padding_memory_mask(
@@ -136,4 +135,39 @@ def discriminator_collate_fn(batch_data, tokenizer, is_train):
     return {
         'dis_text_input_ids': dis_text_input_ids,
         'labels': torch.stack(labels),
+    }
+
+
+def generator_en_collate_fn(batch_data, tokenizer, is_train):
+    """
+        function_inputs: {text1, text2}
+        model_inputs: {nosiy_text1, text2}
+        prompt: "<text1>" is similar to "<text2>", "<text2>" is similar to "<text1>"
+    """
+    input_ids, attention_mask, lengths = [], [], []
+    for item in batch_data:
+        if is_train:
+            text1 = tokenizer(item['text1'], return_tensors='pt').input_ids
+            noisy_text1 = noisy(x=text1, drop_prob=0, sub_prob=0.05, shuffle_dist=0, 
+                                bos_token=2, pad_token=1, vocab_size=50272)
+            item['text1'] = tokenizer.decode(noisy_text1.squeeze(), skip_special_tokens=True)
+
+        prompt_text = '"' + item['text1'] + '" is similar to "' + item['text2'] + '"'
+        prompt = tokenizer(prompt_text, return_tensors='pt')
+        text2_ids = tokenizer(item['text2'] + '"', return_tensors='pt').input_ids.squeeze()
+        length = torch.tensor(
+            [1] * (len(prompt.input_ids.squeeze()) - len(text2_ids)) + [len(text2_ids)] * len(text2_ids))
+
+        input_ids.append(prompt.input_ids.squeeze())
+        attention_mask.append(prompt.attention_mask.squeeze())
+        lengths.append(length)
+        
+    input_ids = pad_sequence([x for x in input_ids], batch_first=True, padding_value=1)
+    attention_mask = pad_sequence([x for x in attention_mask], batch_first=True, padding_value=0)
+    lengths = pad_sequence([x for x in lengths], batch_first=True, padding_value=1)
+
+    return {
+        'input_ids': input_ids,
+        'attention_mask': attention_mask,
+        'lengths': lengths
     }

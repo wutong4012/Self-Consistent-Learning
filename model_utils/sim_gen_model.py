@@ -2,7 +2,7 @@ import json
 
 import torch
 import torch.nn as nn
-from transformers import BertForSequenceClassification
+from transformers import BertForSequenceClassification, OPTForCausalLM
 
 # from model_utils.gpt2_for_inference import GPT2Model
 from model_utils.gpt2_modeling import GPT2Model
@@ -130,5 +130,49 @@ class Generator(nn.Module):
         loss = (loss * (
             (lengths_input_ids.view(-1) > 1).int()) / lengths_input_ids.view(-1)
         ).sum() / total_num 
+        
+        return loss, gen_output
+
+
+class Generator_EN(nn.Module):
+
+    def __init__(self, config) -> None:
+        super().__init__()
+        
+        if config.cycle == 0 or config.cycle == -1:
+            self.gen = OPTForCausalLM.from_pretrained(
+                '/cognitive_comp/wutong/source/model_base/opt-2.7b')
+        
+        else:
+            pt_path = config.ckpt_model_path +\
+                f'/generator_cycle_{config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt'
+            new_dict = {}
+            state_dict = torch.load(pt_path, map_location='cpu')['module']
+            for k, v in state_dict.items():
+                if any([i in k for i in ['module.generator.gen.']]):
+                    new_dict[k[len('module.generator.gen.'):]] = v
+                else:
+                    continue
+            if new_dict == {}:
+                new_dict = state_dict
+            self.gen.load_state_dict(new_dict)
+
+        print(f'Cycle {config.cycle}: The Generator Transformer-XL Load Successfully !\n')
+        
+    def forward(self, input_ids, attention_mask, lengths):
+        gen_output = self.gen.forward(
+            input_ids=input_ids,
+            attention_mask=attention_mask
+        ).logits
+        
+        shift_logits = gen_output[..., :-1, :].contiguous()  # [bs, seq_len-1, vocab_size]
+        shift_labels = input_ids[..., 1:].contiguous()  # [bs, seq_len-1]
+
+        loss_fct = nn.CrossEntropyLoss(reduce=False)  
+        loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)),
+                        shift_labels.view(-1)) # [bs*(seq_len-1), ]
+        
+        lengths = lengths[..., 1:].contiguous()
+        loss = (loss * ((lengths.view(-1) > 1).int()) / lengths.view(-1)).sum() / input_ids.size(0) 
         
         return loss, gen_output

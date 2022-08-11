@@ -55,14 +55,18 @@ def multiply_pre_score(config, raw_dataset, rank):
         assert all_logits.size(0) == raw_dataset.num_rows
         
         for idx in range(raw_dataset.num_rows):
-            if all_logits[idx][0] >= threshold0:
-                scores.append(0)
-                text1.append(raw_dataset['text1'][idx])
-                text2.append(raw_dataset['text2'][idx])
-            elif all_logits[idx][1] >= threshold1:
-                scores.append(1)
-                text1.append(raw_dataset['text1'][idx])
-                text2.append(raw_dataset['text2'][idx])
+            scores.append(1)
+            text1.append(raw_dataset['text1'][idx])
+            text2.append(raw_dataset['text2'][idx])
+            
+            # if all_logits[idx][0] >= threshold0:
+            #     scores.append(0)
+            #     text1.append(raw_dataset['text1'][idx])
+            #     text2.append(raw_dataset['text2'][idx])
+            # elif all_logits[idx][1] >= threshold1:
+            #     scores.append(1)
+            #     text1.append(raw_dataset['text1'][idx])
+            #     text2.append(raw_dataset['text2'][idx])
 
     discriminator.to('cpu')
     if rank == 0:

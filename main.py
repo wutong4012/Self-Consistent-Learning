@@ -26,8 +26,8 @@ def set_trainer(config, ckpt_callback, early_stopping):
         precision=16,
         log_every_n_steps=1,
         num_sanity_val_steps=0,
-        check_val_every_n_epoch=1,  ##
-        # val_check_interval=400,
+        # check_val_every_n_epoch=1,  ##
+        val_check_interval=400,
         callbacks=[lr_callback, ckpt_callback, early_stopping],
         max_epochs=50,
     )
@@ -68,9 +68,11 @@ def generator_cycle(config):
     torch.cuda.empty_cache()
     if config.cycle != -1:
         gen_trainer.fit(gen_system)
-    gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
-    gen_postprocess(gen_output, gen_system.gen_tokenizer, 
-                    config, gen_system.global_rank)
+
+    if not config.pretrain_gen:
+        gen_output = concat_data(all_gather(gen_trainer.predict(gen_system)))
+        gen_postprocess(gen_output, gen_system.gen_tokenizer, 
+                        config, gen_system.global_rank)
 
 
 def discriminator_cycle(config):
@@ -121,8 +123,9 @@ def run(config):
         if not config.pretrain_dis:
             generator_cycle(config)
             gc.collect()
-        discriminator_cycle(config)
-        gc.collect()
+        if not config.pretrain_gen:
+            discriminator_cycle(config)
+            gc.collect()
 
 
 if __name__ == '__main__':

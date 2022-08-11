@@ -5,7 +5,8 @@ import datasets
 from torch.utils.data import DataLoader, Dataset
 
 from data_utlis.sim_data_collate import (discriminator_collate_fn,
-                                         generator_collate_fn)
+                                         generator_collate_fn, 
+                                         generator_en_collate_fn)
 
 
 class SimGanDataset(Dataset):
@@ -190,7 +191,7 @@ def set_gen_dataset(config, rank, part_labeled_data, generated_data):
 
 
 def set_dataset(config, use_label, use_gen, attri, rank):
-    if not config.pretrain_dis:
+    if not config.pretrain_dis and not config.pretrain_gen:
         if use_gen and not use_label:
             generated_data = load_data(config, rank, is_labeled=False, attri=attri)
 
@@ -250,6 +251,14 @@ def set_dataset(config, use_label, use_gen, attri, rank):
             config.test_data_path + config.data_name)  # fine-tune
         val_dataset = SimGanDataset(data=test_data)
         
+    elif config.pretrain_gen:
+        train_data = datasets.load_from_disk(
+            '/cognitive_comp/wutong/source/sim_data/similarity_data_en/qqp_train')
+        train_dataset = SimGanDataset(data=train_data)
+        test_data = datasets.load_from_disk(
+            '/cognitive_comp/wutong/source/sim_data/similarity_data_en/qqp_test')
+        val_dataset = SimGanDataset(data=test_data)
+        
     else:
         train_dataset = SimGanDataset(data=data)
         test_data = datasets.load_from_disk(config.test_data_path + config.data_name)
@@ -263,7 +272,7 @@ def set_dataset(config, use_label, use_gen, attri, rank):
     return train_dataset, val_dataset
 
 
-def create_dataloader(config, dataset, tokenizer, attri='gen', shuffle=True):
+def create_dataloader(config, dataset, tokenizer, attri=None, shuffle=True):
     if attri == 'dis':
         batch_size = config.dis_batch_size
 
@@ -277,6 +286,13 @@ def create_dataloader(config, dataset, tokenizer, attri='gen', shuffle=True):
         def collate_fn(batch_data):
             return generator_collate_fn(
                 batch_data, tokenizer, config.gen_batch_size, is_train=shuffle)
+    
+    elif attri == 'gen_en':
+        batch_size = config.gen_en_batch_size
+        
+        def collate_fn(batch_data):
+            return generator_en_collate_fn(
+                batch_data, tokenizer, is_train=shuffle)
 
     dataloader = DataLoader(
         dataset=dataset,
