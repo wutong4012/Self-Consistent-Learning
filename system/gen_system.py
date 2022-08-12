@@ -34,7 +34,6 @@ class GenSystem(LightningModule):
                 eos_token='<|endoftext|>',
                 pad_token='<|endoftext|>',
                 extra_ids=0)
-            self.gen_tokenizer.add_special_tokens({'bos_token': '<bos>'})
             self.generator = Generator(self.config)
 
         else:
@@ -64,10 +63,6 @@ class GenSystem(LightningModule):
                                  tokenizer=self.gen_tokenizer, attri=attri, shuffle=False)
 
     def predict_dataloader(self):
-        # if self.config.top_p > 0.1:
-        #     self.config.top_p -= 0.1
-        # if self.config.repetition_penalty < 1.5:
-        #     self.config.repetition_penalty += 0.1
         if self.global_rank == 0:
             print('**********Start to Prepare the Predict Dataloader**********')
             print(f'**********The Top-P is {self.config.top_p}**********')

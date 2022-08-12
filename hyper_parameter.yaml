@@ -2,8 +2,7 @@ seed: 42
 exp_dir: /cognitive_comp/wutong/similarity_generation/experiments/
 txl_config_path: /cognitive_comp/wutong/similarity_generation/model_utils/txl_5B_config.json
 
-txl_model_path: /cognitive_comp/wutong/source/model_base/txl_zh_5.0B.pt
-dis_model_path: /cognitive_comp/wutong/source/model_base/
+model_path: /cognitive_comp/wutong/source/model_base/model_en/  # zh / en
 sp_model_path: /cognitive_comp/wutong/source/model_base/chinese_sentencepiece/cog-pretrain.model
 
 test_sentence_path: /cognitive_comp/wutong/source/sim_data/predict_sentences/
@@ -23,7 +22,7 @@ gen_repeat_times: 1  # 每条句子重复生成的次数
 dis_batch_size: 128  # 128 / 384
 gen_batch_size: 2
 gen_big_batch_size: 30
-gen_en_batch_size: 64
+gen_en_batch_size: 48
 pre_gen_bs: 512  # 生成样本的batch size
 pre_dis_bs: 1024
 

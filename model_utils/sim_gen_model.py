@@ -14,7 +14,7 @@ class Discriminator(nn.Module):
         super().__init__()
 
         self.dis = BertForSequenceClassification.from_pretrained(
-            config.dis_model_path + config.discriminator, num_labels=2)
+            config.model_path + config.discriminator, num_labels=2)
         
         if config.pretrain_dis and not config.warm_up_model:
             return
@@ -23,9 +23,9 @@ class Discriminator(nn.Module):
             print('Use Warm Up Model...')
             if config.cycle == 0 or config.cycle == -1:
                 if config.zero_shot == 1:
-                    pt_path = config.dis_model_path + 'roberta_' + config.data_name + '0.pt'
+                    pt_path = config.model_path + 'roberta_' + config.data_name + '0.pt'
                 else:
-                    pt_path = config.dis_model_path + 'roberta_' + config.data_name + '.pt'
+                    pt_path = config.model_path + 'roberta_' + config.data_name + '.pt'
                 print(f'The warm up model path is {pt_path}!')
             else:
                 pt_path = config.ckpt_model_path + \
@@ -95,7 +95,7 @@ class Generator(nn.Module):
         )
         
         if config.cycle == 0 or config.cycle == -1:
-            pt_path = config.txl_model_path
+            pt_path = config.model_path + 'txl_zh_5.0B.pt'
         else:
             pt_path = config.ckpt_model_path +\
                 f'/generator_cycle_{config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt'
@@ -140,8 +140,7 @@ class Generator_EN(nn.Module):
         super().__init__()
         
         if config.cycle == 0 or config.cycle == -1:
-            self.gen = OPTForCausalLM.from_pretrained(
-                '/cognitive_comp/wutong/source/model_base/opt-2.7b')
+            self.gen = OPTForCausalLM.from_pretrained(config.model_path + 'opt-2.7b')
         
         else:
             pt_path = config.ckpt_model_path +\

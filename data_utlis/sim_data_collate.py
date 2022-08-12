@@ -29,7 +29,7 @@ def generator_collate_fn(batch_data, tokenizer, real_batch_size, is_train):
     """
         function_inputs: {text1, text2}
         model_inputs: {nosiy_text1, text2}
-        prompt: <bos>“<第一句>”的相似句是“<第二句>”<eos>
+        prompt: “<第一句>”的相似句是“<第二句>”<eos>
     """
     max_length, total_num = 400, 0
     prompts, lengths, attention_mask = [], [], []
@@ -41,7 +41,7 @@ def generator_collate_fn(batch_data, tokenizer, real_batch_size, is_train):
                                 bos_token=50001, pad_token=50000, vocab_size=50176)
             item['text1'] = tokenizer.decode(noisy_text1.squeeze(), skip_special_tokens=True)
 
-        prompt_text = '<bos>“' + item['text1'] + '”的相似句是“' + item['text2'] + '”'
+        prompt_text = '“' + item['text1'] + '”的相似句是“' + item['text2'] + '”'
         prompt = tokenizer(
             prompt_text.replace(' ', ''), return_tensors='pt').input_ids.squeeze()
         if len(prompt) > 400:
@@ -142,23 +142,33 @@ def generator_en_collate_fn(batch_data, tokenizer, is_train):
     """
         function_inputs: {text1, text2}
         model_inputs: {nosiy_text1, text2}
-        prompt: "<text1>" is similar to "<text2>", "<text2>" is similar to "<text1>"
+        prompt: "<text1>" is similar to "<text2>"
     """
     input_ids, attention_mask, lengths = [], [], []
     for item in batch_data:
-        if is_train:
-            text1 = tokenizer(item['text1'], return_tensors='pt').input_ids
-            noisy_text1 = noisy(x=text1, drop_prob=0, sub_prob=0.05, shuffle_dist=0, 
-                                bos_token=2, pad_token=1, vocab_size=50272)
-            item['text1'] = tokenizer.decode(noisy_text1.squeeze(), skip_special_tokens=True)
-
-        prompt_text = '"' + item['text1'] + '" is similar to "' + item['text2'] + '"'
+        # if is_train:
+        #     text1 = tokenizer(item['text1'], return_tensors='pt').input_ids
+        #     noisy_text1 = noisy(x=text1, drop_prob=0, sub_prob=0.05, shuffle_dist=0, 
+        #                         bos_token=2, pad_token=1, vocab_size=50272)
+        #     try:
+        #         item['text1'] = tokenizer.decode(noisy_text1.squeeze(), skip_special_tokens=True)
+        #     except TypeError:
+        #         print(text1)
+        #         print(noisy_text1)
+        if item['text2'] == 'general':
+            prompt_text = item['text1']
+        else:
+            prompt_text = '"' + item['text1'] + '" is similar to "' + item['text2'] + '"'
         prompt = tokenizer(prompt_text, return_tensors='pt')
+        # 因为<bos>和<eos>的token id一样，所以去掉自动添加的<bos>, 并手动添加<eos>
+        prompt_input_ids = torch.cat((prompt.input_ids.squeeze()[1:], torch.tensor([2])))
+
+        # 自动加了<bos>, 等效于手动加了<eos>, 长度不变
         text2_ids = tokenizer(item['text2'] + '"', return_tensors='pt').input_ids.squeeze()
         length = torch.tensor(
-            [1] * (len(prompt.input_ids.squeeze()) - len(text2_ids)) + [len(text2_ids)] * len(text2_ids))
+            [1] * (len(prompt_input_ids) - len(text2_ids)) + [len(text2_ids)] * len(text2_ids))
 
-        input_ids.append(prompt.input_ids.squeeze())
+        input_ids.append(prompt_input_ids)
         attention_mask.append(prompt.attention_mask.squeeze())
         lengths.append(length)
         
