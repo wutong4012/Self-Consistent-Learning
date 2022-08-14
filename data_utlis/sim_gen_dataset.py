@@ -253,10 +253,10 @@ def set_dataset(config, use_label, use_gen, attri, rank):
         
     elif config.pretrain_gen:
         train_data = datasets.load_from_disk(
-            '/cognitive_comp/wutong/source/sim_data/similarity_data_en/qqp_train')
+            '/cognitive_comp/wutong/source/sim_data/similarity_data_en/pre_train')
         train_dataset = SimGanDataset(data=train_data)
         test_data = datasets.load_from_disk(
-            '/cognitive_comp/wutong/source/sim_data/similarity_data_en/qqp_test')
+            '/cognitive_comp/wutong/source/sim_data/similarity_data_en/pre_val')
         val_dataset = SimGanDataset(data=test_data)
         
     else:

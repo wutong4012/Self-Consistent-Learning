@@ -144,7 +144,7 @@ def generator_en_collate_fn(batch_data, tokenizer, is_train):
         model_inputs: {nosiy_text1, text2}
         prompt: "<text1>" is similar to "<text2>"
     """
-    input_ids, attention_mask, lengths = [], [], []
+    input_ids, lengths = [], []
     for item in batch_data:
         # if is_train:
         #     text1 = tokenizer(item['text1'], return_tensors='pt').input_ids
@@ -157,27 +157,29 @@ def generator_en_collate_fn(batch_data, tokenizer, is_train):
         #         print(noisy_text1)
         if item['text2'] == 'general':
             prompt_text = item['text1']
+            prompt = tokenizer(prompt_text, return_tensors='pt')
+            # 太长只取前400个token
+            prompt_input_ids = torch.cat((prompt.input_ids.squeeze()[1:400], torch.tensor([2])))
+            length = torch.tensor([1 / len(prompt_input_ids)] * len(prompt_input_ids))
+            
         else:
             prompt_text = '"' + item['text1'] + '" is similar to "' + item['text2'] + '"'
-        prompt = tokenizer(prompt_text, return_tensors='pt')
-        # 因为<bos>和<eos>的token id一样，所以去掉自动添加的<bos>, 并手动添加<eos>
-        prompt_input_ids = torch.cat((prompt.input_ids.squeeze()[1:], torch.tensor([2])))
+            prompt = tokenizer(prompt_text, return_tensors='pt')
+            # 因为<bos>和<eos>的token id一样，所以去掉自动添加的<bos>, 并手动添加<eos>
+            prompt_input_ids = torch.cat((prompt.input_ids.squeeze()[1:], torch.tensor([2])))
 
-        # 自动加了<bos>, 等效于手动加了<eos>, 长度不变
-        text2_ids = tokenizer(item['text2'] + '"', return_tensors='pt').input_ids.squeeze()
-        length = torch.tensor(
-            [1] * (len(prompt_input_ids) - len(text2_ids)) + [len(text2_ids)] * len(text2_ids))
+            # 自动加了<bos>, 等效于手动加了<eos>, 长度不变
+            text2_ids = tokenizer(item['text2'] + '"', return_tensors='pt').input_ids.squeeze()
+            length = torch.tensor(
+                [0] * (len(prompt_input_ids) - len(text2_ids)) + [1 / len(text2_ids)] * len(text2_ids))
 
         input_ids.append(prompt_input_ids)
-        attention_mask.append(prompt.attention_mask.squeeze())
         lengths.append(length)
         
     input_ids = pad_sequence([x for x in input_ids], batch_first=True, padding_value=1)
-    attention_mask = pad_sequence([x for x in attention_mask], batch_first=True, padding_value=0)
-    lengths = pad_sequence([x for x in lengths], batch_first=True, padding_value=1)
+    lengths = pad_sequence([x for x in lengths], batch_first=True, padding_value=0)
 
     return {
         'input_ids': input_ids,
-        'attention_mask': attention_mask,
         'lengths': lengths
     }

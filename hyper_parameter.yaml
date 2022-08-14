@@ -22,7 +22,7 @@ gen_repeat_times: 1  # 每条句子重复生成的次数
 dis_batch_size: 128  # 128 / 384
 gen_batch_size: 2
 gen_big_batch_size: 30
-gen_en_batch_size: 48
+gen_en_batch_size: 4
 pre_gen_bs: 512  # 生成样本的batch size
 pre_dis_bs: 1024
 
@@ -48,8 +48,7 @@ sentence_num: 5000
 gen_train_steps: 200
 dis_train_steps: 50000  ####
 warmup_steps: 5000  ####
-checkpoint_steps: 10
-es_patience: 1
+es_patience: 5
 
 vae2gen: False
 txl2gen: True

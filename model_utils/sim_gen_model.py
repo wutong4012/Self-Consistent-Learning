@@ -158,7 +158,8 @@ class Generator_EN(nn.Module):
 
         print(f'Cycle {config.cycle}: The Generator Transformer-XL Load Successfully !\n')
         
-    def forward(self, input_ids, attention_mask, lengths):
+    def forward(self, input_ids, lengths):
+        attention_mask = (input_ids > 1).int()
         gen_output = self.gen.forward(
             input_ids=input_ids,
             attention_mask=attention_mask
@@ -172,6 +173,6 @@ class Generator_EN(nn.Module):
                         shift_labels.view(-1)) # [bs*(seq_len-1), ]
         
         lengths = lengths[..., 1:].contiguous()
-        loss = (loss * ((lengths.view(-1) > 1).int()) / lengths.view(-1)).sum() / input_ids.size(0) 
+        loss = (loss * lengths.view(-1)).sum() / input_ids.size(0) 
         
         return loss, gen_output

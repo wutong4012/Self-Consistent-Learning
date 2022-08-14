@@ -38,7 +38,7 @@ class GenSystem(LightningModule):
 
         else:
             self.gen_tokenizer = GPT2Tokenizer.from_pretrained(
-                '/cognitive_comp/wutong/source/model_base/opt-2.7b')
+                self.config.model_path + 'opt-2.7b')
             self.generator = Generator_EN(self.config)
 
 
@@ -106,7 +106,6 @@ class GenSystem(LightningModule):
         else:
             loss, _ = self.generator.forward(
                 batch['input_ids'].cuda(),
-                batch['attention_mask'].cuda(),
                 batch['lengths'].cuda(),
             )
             
@@ -125,7 +124,6 @@ class GenSystem(LightningModule):
         else:
             loss, _ = self.generator.forward(
                 batch['input_ids'].cuda(),
-                batch['attention_mask'].cuda(),
                 batch['lengths'].cuda(),
             )
 

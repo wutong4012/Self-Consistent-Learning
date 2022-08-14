@@ -27,7 +27,7 @@ def set_trainer(config, ckpt_callback, early_stopping):
         log_every_n_steps=1,
         num_sanity_val_steps=0,
         # check_val_every_n_epoch=1,  ##
-        val_check_interval=100,
+        val_check_interval=400,
         callbacks=[lr_callback, ckpt_callback, early_stopping],
         max_epochs=50,
     )
