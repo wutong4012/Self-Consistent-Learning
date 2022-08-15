@@ -135,10 +135,17 @@ class GenSystem(LightningModule):
         torch.cuda.empty_cache()
 
         self.generator.gen.to('cuda').eval()
-        output_dict = sample_sequence_batch(
-            model=self.generator.gen, context_tokens_tensor=batch['input_ids'].cuda(),
-            context_length_tensor=batch['length_tensor'], repetition_penalty=self.config.repetition_penalty,
-            max_out_seq=200, end_token_id=50000, temperature=1.0, top_k=self.config.top_k, top_p=self.config.top_p,
-        )
+        if self.config.chinese:
+            output_dict = sample_sequence_batch(
+                model=self.generator.gen, context_tokens_tensor=batch['input_ids'].cuda(),
+                context_length_tensor=batch['length_tensor'], repetition_penalty=self.config.repetition_penalty,
+                max_out_seq=200, end_token_id=50000, temperature=1.0, top_k=self.config.top_k, top_p=self.config.top_p,
+            )
+        else:
+            generate_ids = self.generator.gen.generate(
+                batch['input_ids'].cuda(), do_sample=True, top_p=self.config.top_p, max_length=200, 
+                num_return_sequences=self.config.gen_nums)
+            output_dict = {'ids_list': generate_ids}
+            
 
         return output_dict

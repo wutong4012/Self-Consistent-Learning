@@ -111,19 +111,19 @@ def discriminator_collate_fn(batch_data, tokenizer, is_train):
     """
     dis_text_input_ids, labels = [], []
     for item in batch_data:
-        if is_train:
-            text1 = tokenizer(item['text1'], return_tensors='pt').input_ids
-            masked_text1 = mask_tokens(
-                inputs=text1, tokenizer=tokenizer, mlm_prob=0.15).squeeze()
-            text2 = tokenizer(item['text2'], return_tensors='pt').input_ids
-            masked_text2 = mask_tokens(
-                inputs=text2, tokenizer=tokenizer, mlm_prob=0.15).squeeze()
-            input_ids = torch.cat((masked_text1, masked_text2[1:]), dim=0)
-        else:
-            dis_text = item['text1'] + '[SEP]' + item['text2']
-            input_ids = tokenizer(dis_text, return_tensors='pt').input_ids.squeeze()
+        # if is_train:
+        #     text1 = tokenizer(item['text1'], return_tensors='pt').input_ids
+        #     masked_text1 = mask_tokens(
+        #         inputs=text1, tokenizer=tokenizer, mlm_prob=0.15).squeeze()
+        #     text2 = tokenizer(item['text2'], return_tensors='pt').input_ids
+        #     masked_text2 = mask_tokens(
+        #         inputs=text2, tokenizer=tokenizer, mlm_prob=0.15).squeeze()
+        #     input_ids = torch.cat((masked_text1, masked_text2[1:]), dim=0)
+        # else:
+        dis_text = item['text1'] + '[SEP]' + item['text2']
+        input_ids = tokenizer(dis_text, return_tensors='pt').input_ids.squeeze()
         
-        if input_ids.size(0) > 203:
+        if input_ids.size(0) > 512:
             continue
 
         dis_text_input_ids.append(input_ids)

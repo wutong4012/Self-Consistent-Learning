@@ -2,10 +2,12 @@ import json
 
 import torch
 import torch.nn as nn
-from transformers import BertForSequenceClassification, OPTForCausalLM
+from transformers import (
+    BertForSequenceClassification, OPTForCausalLM, 
+    AlbertForSequenceClassification)
 
-# from model_utils.gpt2_for_inference import GPT2Model
-from model_utils.gpt2_modeling import GPT2Model
+from model_utils.gpt2_for_inference import GPT2Model
+# from model_utils.gpt2_modeling import GPT2Model
 
 
 class Discriminator(nn.Module):
@@ -13,8 +15,12 @@ class Discriminator(nn.Module):
     def __init__(self, config) -> None:
         super().__init__()
 
-        self.dis = BertForSequenceClassification.from_pretrained(
-            config.model_path + config.discriminator, num_labels=2)
+        if config.chinese:
+            self.dis = BertForSequenceClassification.from_pretrained(
+                config.model_path + config.discriminator, num_labels=2)
+        else:
+            self.dis = AlbertForSequenceClassification.from_pretrained(
+                config.model_path + config.discriminator, num_labels=2)
         
         if config.pretrain_dis and not config.warm_up_model:
             return
@@ -23,9 +29,15 @@ class Discriminator(nn.Module):
             print('Use Warm Up Model...')
             if config.cycle == 0 or config.cycle == -1:
                 if config.zero_shot == 1:
-                    pt_path = config.model_path + 'roberta_' + config.data_name + '0.pt'
+                    if config.chinese:
+                        pt_path = config.model_path + 'roberta_' + config.data_name + '0.pt'
+                    else:
+                        pt_path = config.model_path + 'albert_' + config.data_name + '0.pt'
                 else:
-                    pt_path = config.model_path + 'roberta_' + config.data_name + '.pt'
+                    if config.chinese:
+                        pt_path = config.model_path + 'roberta_' + config.data_name + '.pt'
+                    else:
+                        pt_path = config.model_path + 'albert_' + config.data_name + '.pt'
                 print(f'The warm up model path is {pt_path}!')
             else:
                 pt_path = config.ckpt_model_path + \

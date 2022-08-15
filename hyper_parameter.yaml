@@ -14,27 +14,28 @@ sim_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_data/
 cache_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_cache/
 
 top_k: 0
-top_p: 0.95
+top_p: 0.8
 std_scale: 1.2
 repetition_penalty: 1.0
 
+gen_nums: 1
 gen_repeat_times: 1  # 每条句子重复生成的次数
-dis_batch_size: 128  # 128 / 384
+dis_batch_size: 32  # 64 / 128
 gen_batch_size: 2
 gen_big_batch_size: 30
 gen_en_batch_size: 4
-pre_gen_bs: 512  # 生成样本的batch size
+pre_gen_bs: 32  # 生成样本的batch size
 pre_dis_bs: 1024
 
 dis_balance: True
 dis_use_label: True
 warm_up_model: False  ####
-pretrain_gen: True  ####
-pretrain_dis: False  ####
+pretrain_gen: False  ####
+pretrain_dis: True  ####
 chinese: False
 
 dis_hidden_size: 1024
-discriminator: roberta_large ##
+discriminator: albert_xxlarge  ## roberta_large
 # hfl/chinese-roberta-wwm-ext-large / IDEA-CCNL/Erlangshen-Roberta-330M-Similarity
 
 learning_rate: 2e-5
@@ -46,9 +47,9 @@ end: 0
 sentence_num: 5000
 
 gen_train_steps: 200
-dis_train_steps: 50000  ####
-warmup_steps: 5000  ####
-es_patience: 5
+dis_train_steps: 800  ####
+warmup_steps: 200  ####
+es_patience: 10
 
 vae2gen: False
 txl2gen: True

@@ -92,19 +92,28 @@ def gen_postprocess(output_dict, gen_tokenizer, config, rank):
     sim_sentence = gen_tokenizer.batch_decode(
         output_dict['ids_list'], skip_special_tokens=True)
 
-    raw_text, sim_text, real_ppl_list = [], [], []
-    for idx, item in enumerate(sim_sentence):
-        if item.count('”的相似句是“') != 1 or (
-                item.count('“') % 2 != 0 or item.count('”') % 2 != 0):
-            continue
+    if config.chinese:
+        raw_text, sim_text, real_ppl_list = [], [], []
+        for idx, item in enumerate(sim_sentence):
+            if item.count('”的相似句是“') != 1 or (
+                    item.count('“') % 2 != 0 or item.count('”') % 2 != 0):
+                continue
 
-        item = item.replace(' ', '').split('”的相似句是“')
-        raw_text.append(item[0][1:])
-        sim_text.append(item[1][:-1])
-    #     real_ppl_list.append(-output_dict['ppl_list'][idx])  # 加上负号，使其越大越好
-
-    # ppl_list = torch.softmax(
-    #     torch.tensor(real_ppl_list), dim=0).numpy().tolist()
+            item = item.replace(' ', '').split('”的相似句是“')
+            raw_text.append(item[0][1:])
+            sim_text.append(item[1][:-1])
+    
+    else:
+        raw_text, sim_text = [], []
+        for item in sim_sentence:
+            if '@' in item:
+                continue
+            item = item.split('\" is similar to \"')
+            if len(item) != 2 or item[0][1:] == item[1][:-1]:
+                continue
+            
+            raw_text.append(item[0][1:])
+            sim_text.append(item[1][:-1])
 
     raw_dataset = Dataset.from_dict({
         'text1': raw_text,
