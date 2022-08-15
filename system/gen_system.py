@@ -146,6 +146,5 @@ class GenSystem(LightningModule):
                 batch['input_ids'].cuda(), do_sample=True, top_p=self.config.top_p, max_length=200, 
                 num_return_sequences=self.config.gen_nums)
             output_dict = {'ids_list': generate_ids}
-            
 
         return output_dict

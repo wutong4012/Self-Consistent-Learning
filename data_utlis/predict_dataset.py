@@ -106,8 +106,6 @@ def gen_postprocess(output_dict, gen_tokenizer, config, rank):
     else:
         raw_text, sim_text = [], []
         for item in sim_sentence:
-            if '@' in item:
-                continue
             item = item.split('\" is similar to \"')
             if len(item) != 2 or item[0][1:] == item[1][:-1]:
                 continue
@@ -181,9 +179,14 @@ def dis_postprocess(dis_output_dict, config, rank):
 def gen_pred_collate(batch_data, gen_tokenizer, config):
     input_ids, length_list = [], []
     for item in batch_data:
-        cur_input_ids = gen_tokenizer(
-            '<bos>“' + item['sentence'] + '”的相似句是“', return_tensors='pt'
-        ).input_ids.squeeze()[:-1]  # 不能加<eos>
+        if config.chinese:
+            cur_input_ids = gen_tokenizer(
+                '<bos>“' + item['sentence'] + '”的相似句是“', return_tensors='pt'
+            ).input_ids.squeeze()[:-1]  # 不能加<eos>
+        else:
+            cur_input_ids = gen_tokenizer(
+                '"' + item['sentence'] + '" is similar to "', return_tensors='pt'
+            ).input_ids.squeeze()[1:]  # 去掉<bos>
 
         # 每个样本复制 N 份
         length = [cur_input_ids.size(0)] * config.gen_repeat_times
@@ -192,8 +195,12 @@ def gen_pred_collate(batch_data, gen_tokenizer, config):
         length_list.extend(length)
         input_ids.extend(cur_input_ids)
 
-    input_ids = pad_sequence(
-        [x for x in input_ids], batch_first=True, padding_value=50000)
+    if config.chinese:
+        input_ids = pad_sequence(
+            [x for x in input_ids], batch_first=True, padding_value=50000)
+    else:
+        input_ids = pad_sequence(
+            [x for x in input_ids], batch_first=True, padding_value=1)
     length_tensor = torch.tensor(length_list)
 
     return {

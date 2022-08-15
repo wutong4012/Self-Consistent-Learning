@@ -151,8 +151,10 @@ class Generator_EN(nn.Module):
     def __init__(self, config) -> None:
         super().__init__()
         
+        self.gen = OPTForCausalLM.from_pretrained(config.model_path + 'opt-2.7b')
+        
         if config.cycle == 0 or config.cycle == -1:
-            self.gen = OPTForCausalLM.from_pretrained(config.model_path + 'opt-2.7b')
+            pt_path = config.model_path + 'opt-2.7b.pt'
         
         else:
             pt_path = config.ckpt_model_path +\
