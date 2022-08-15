@@ -29,9 +29,9 @@ pre_dis_bs: 1024
 
 dis_balance: True
 dis_use_label: True
-warm_up_model: False  ####
+warm_up_model: True  ####
 pretrain_gen: False  ####
-pretrain_dis: True  ####
+pretrain_dis: False  ####
 chinese: False
 
 dis_hidden_size: 1024
@@ -39,17 +39,17 @@ discriminator: albert_xxlarge  ## roberta_large
 # hfl/chinese-roberta-wwm-ext-large / IDEA-CCNL/Erlangshen-Roberta-330M-Similarity
 
 learning_rate: 2e-5
-cycle_num: 1  ####
-cycle: 0  ####
+cycle_num: 10  ####
+cycle: -1  ####
 idx: -1
 start: 0 
 end: 0
 sentence_num: 5000
 
 gen_train_steps: 200
-dis_train_steps: 800  ####
-warmup_steps: 200  ####
-es_patience: 10
+dis_train_steps: 200  ####
+warmup_steps: 20  ####
+es_patience: 1
 
 vae2gen: False
 txl2gen: True

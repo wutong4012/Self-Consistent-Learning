@@ -19,7 +19,7 @@ def set_trainer(config, ckpt_callback, early_stopping):
     lr_callback = LearningRateMonitor(logging_interval='step')
     trainer = Trainer(
         default_root_dir=config.exp_dir,
-        gpus=1,  ##
+        gpus=8,  ##
         strategy=DeepSpeedStrategy(
             offload_optimizer=True,
             logging_batch_size_per_gpu=1),
@@ -47,9 +47,9 @@ def concat_data(raw_list):  # List[Dict]<-(world_size, batch_num)
 
 def generator_cycle(config):
     gen_ckpt_callback = ModelCheckpoint(
-        save_top_k=-1,
-        # monitor='gen_val_loss',
-        # mode='min',
+        save_top_k=1,
+        monitor='gen_val_loss',
+        mode='min',
         filename=f'generator_cycle_{config.cycle + 1}',
         dirpath=config.ckpt_model_path,
     )

@@ -111,17 +111,17 @@ def discriminator_collate_fn(batch_data, tokenizer, is_train):
     """
     dis_text_input_ids, labels = [], []
     for item in batch_data:
-        # if is_train:
-        #     text1 = tokenizer(item['text1'], return_tensors='pt').input_ids
-        #     masked_text1 = mask_tokens(
-        #         inputs=text1, tokenizer=tokenizer, mlm_prob=0.15).squeeze()
-        #     text2 = tokenizer(item['text2'], return_tensors='pt').input_ids
-        #     masked_text2 = mask_tokens(
-        #         inputs=text2, tokenizer=tokenizer, mlm_prob=0.15).squeeze()
-        #     input_ids = torch.cat((masked_text1, masked_text2[1:]), dim=0)
-        # else:
-        dis_text = item['text1'] + '[SEP]' + item['text2']
-        input_ids = tokenizer(dis_text, return_tensors='pt').input_ids.squeeze()
+        if is_train:
+            text1 = tokenizer(item['text1'], return_tensors='pt').input_ids
+            masked_text1 = mask_tokens(
+                inputs=text1, tokenizer=tokenizer, mlm_prob=0.15).squeeze()
+            text2 = tokenizer(item['text2'], return_tensors='pt').input_ids
+            masked_text2 = mask_tokens(
+                inputs=text2, tokenizer=tokenizer, mlm_prob=0.15).squeeze()
+            input_ids = torch.cat((masked_text1, masked_text2[1:]), dim=0)
+        else:
+            dis_text = item['text1'] + '[SEP]' + item['text2']
+            input_ids = tokenizer(dis_text, return_tensors='pt').input_ids.squeeze()
         
         if input_ids.size(0) > 512:
             continue
@@ -146,15 +146,14 @@ def generator_en_collate_fn(batch_data, tokenizer, is_train):
     """
     input_ids, lengths = [], []
     for item in batch_data:
-        # if is_train:
-        #     text1 = tokenizer(item['text1'], return_tensors='pt').input_ids
-        #     noisy_text1 = noisy(x=text1, drop_prob=0, sub_prob=0.05, shuffle_dist=0, 
-        #                         bos_token=2, pad_token=1, vocab_size=50272)
-        #     try:
-        #         item['text1'] = tokenizer.decode(noisy_text1.squeeze(), skip_special_tokens=True)
-        #     except TypeError:
-        #         print(text1)
-        #         print(noisy_text1)
+        if is_train:
+            text1 = tokenizer(item['text1'], return_tensors='pt').input_ids
+            noisy_text1 = noisy(x=text1, drop_prob=0, sub_prob=0.05, shuffle_dist=0, 
+                                bos_token=2, pad_token=1, vocab_size=50272)
+            try:
+                item['text1'] = tokenizer.decode(noisy_text1.squeeze(), skip_special_tokens=True)
+            except TypeError:
+                pass
         if item['text2'] == 'general':
             prompt_text = item['text1']
             prompt = tokenizer(prompt_text, return_tensors='pt')
