@@ -8,7 +8,7 @@ import datasets
 from datasets import Dataset
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
-from transformers import BertTokenizer
+from transformers import BertTokenizer, AlbertTokenizer
 
 from data_utlis.sim_gen_dataset import load_data, SimGanDataset
 from model_utils.sim_gen_model import Discriminator
@@ -20,8 +20,12 @@ feats = datasets.Features({"text1": datasets.Value('string'),
 
 
 def multiply_pre_score(config, raw_dataset, rank):
-    dis_tokenizer = BertTokenizer.from_pretrained(
-        config.dis_model_path + config.discriminator)
+    if config.chinese:
+        dis_tokenizer = BertTokenizer.from_pretrained(
+            config.model_path + config.discriminator)
+    else:
+        dis_tokenizer = AlbertTokenizer.from_pretrained(
+            config.model_path + config.discriminator)
     discriminator = Discriminator(config).cuda().eval()
     
     predict_dataset = SimGanDataset(raw_dataset)
@@ -29,7 +33,7 @@ def multiply_pre_score(config, raw_dataset, rank):
         return dis_pred_collate(batch_data, dis_tokenizer)
     dataloader = DataLoader(
         dataset=predict_dataset,
-        batch_size=384,
+        batch_size=96,  # en-96 / zh-384
         shuffle=False,
         num_workers=8,
         pin_memory=True,

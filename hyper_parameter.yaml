@@ -20,12 +20,12 @@ repetition_penalty: 1.0
 
 gen_nums: 1
 gen_repeat_times: 1  # 每条句子重复生成的次数
-dis_batch_size: 32  # 64 / 128
+dis_batch_size: 24  # en-24 / zh-128
 gen_batch_size: 2
 gen_big_batch_size: 30
-gen_en_batch_size: 4
-pre_gen_bs: 32  # 生成样本的batch size
-pre_dis_bs: 1024
+gen_en_batch_size: 32  # pre-4 / 32
+pre_gen_bs: 32  # 160
+pre_dis_bs: 256
 
 dis_balance: True
 dis_use_label: True
@@ -46,9 +46,9 @@ start: 0
 end: 0
 sentence_num: 5000
 
-gen_train_steps: 200
-dis_train_steps: 200  ####
-warmup_steps: 20  ####
+gen_train_steps: 400
+dis_train_steps: 400  ####
+warmup_steps: 40  ####
 es_patience: 1
 
 vae2gen: False
