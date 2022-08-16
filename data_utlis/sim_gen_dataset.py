@@ -83,7 +83,7 @@ def load_data(config, rank, is_labeled=False, is_score=False, attri=None):
     if is_labeled:
         if config.zero_shot == 1:
             sim_dataset = datasets.load_from_disk(
-                '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled4' + config.data_name)
+                '/cognitive_comp/wutong/source/sim_data/similarity_data_en/labeled4' + config.data_name)  #  / _en
         else:
             sim_dataset = datasets.load_from_disk(
                 config.lab_data_path + config.data_name + '_train_ds')

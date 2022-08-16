@@ -33,7 +33,7 @@ def multiply_pre_score(config, raw_dataset, rank):
         return dis_pred_collate(batch_data, dis_tokenizer)
     dataloader = DataLoader(
         dataset=predict_dataset,
-        batch_size=96,  # en-96 / zh-384
+        batch_size=config.pre_dis_bs,
         shuffle=False,
         num_workers=8,
         pin_memory=True,
@@ -59,18 +59,19 @@ def multiply_pre_score(config, raw_dataset, rank):
         assert all_logits.size(0) == raw_dataset.num_rows
         
         for idx in range(raw_dataset.num_rows):
-            scores.append(1)
-            text1.append(raw_dataset['text1'][idx])
-            text2.append(raw_dataset['text2'][idx])
+            # 全协同
+            # scores.append(1)
+            # text1.append(raw_dataset['text1'][idx])
+            # text2.append(raw_dataset['text2'][idx])
             
-            # if all_logits[idx][0] >= threshold0:
-            #     scores.append(0)
-            #     text1.append(raw_dataset['text1'][idx])
-            #     text2.append(raw_dataset['text2'][idx])
-            # elif all_logits[idx][1] >= threshold1:
-            #     scores.append(1)
-            #     text1.append(raw_dataset['text1'][idx])
-            #     text2.append(raw_dataset['text2'][idx])
+            if all_logits[idx][0] >= threshold0:
+                scores.append(0)
+                text1.append(raw_dataset['text1'][idx])
+                text2.append(raw_dataset['text2'][idx])
+            elif all_logits[idx][1] >= threshold1:
+                scores.append(1)
+                text1.append(raw_dataset['text1'][idx])
+                text2.append(raw_dataset['text2'][idx])
 
     discriminator.to('cpu')
     if rank == 0:

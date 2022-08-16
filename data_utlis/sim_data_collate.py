@@ -164,8 +164,10 @@ def generator_en_collate_fn(batch_data, tokenizer, is_train):
         else:
             prompt_text = '"' + item['text1'] + '" is similar to "' + item['text2'] + '"'
             prompt = tokenizer(prompt_text, return_tensors='pt')
+            if len(prompt.input_ids.squeeze()) > 512:
+                continue
             # 因为<bos>和<eos>的token id一样，所以去掉自动添加的<bos>, 并手动添加<eos>
-            prompt_input_ids = torch.cat((prompt.input_ids.squeeze()[1:511], torch.tensor([2])))
+            prompt_input_ids = torch.cat((prompt.input_ids.squeeze()[1:], torch.tensor([2])))
 
             # 自动加了<bos>, 等效于手动加了<eos>, 长度不变
             text2_ids = tokenizer(item['text2'] + '"', return_tensors='pt').input_ids.squeeze()
