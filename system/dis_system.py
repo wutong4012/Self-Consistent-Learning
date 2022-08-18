@@ -1,7 +1,7 @@
 import torch
 from sklearn.metrics import accuracy_score, f1_score
 from pytorch_lightning import LightningModule
-from transformers import BertTokenizer, AlbertTokenizer
+from transformers import AlbertTokenizer, AutoTokenizer
 from transformers.optimization import AdamW, get_cosine_schedule_with_warmup
 
 from data_utlis.predict_dataset import create_predict_dataloader
@@ -25,8 +25,8 @@ class DisSystem(LightningModule):
 
     def _set_tokenizers_and_models(self):
         if self.config.chinese:
-            self.dis_tokenizer = BertTokenizer.from_pretrained(
-                self.config.model_path + self.config.discriminator)
+            self.dis_tokenizer = AutoTokenizer.from_pretrained(
+                self.config.discriminator_zh)
         
         else:
             self.dis_tokenizer = AlbertTokenizer.from_pretrained(

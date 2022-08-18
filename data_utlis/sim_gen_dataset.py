@@ -79,6 +79,34 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
     return sim_dataset
 
 
+def preprocess_gen_data_en(config, rank, data_path, sim_dataset):
+    def process_equal(example):
+        if (example['text2'] in example['text1']) or (example['text1'] in example['text2']):
+            example['score'] = -1
+        elif len(example['text2'].split(' ')) < 5:  # 最小长度设为5
+            example['score'] = -2
+        return example
+
+    if rank > 0:
+        print(f'Rank {rank} waiting for main process to perform the mapping')
+        torch.distributed.barrier()
+
+    sim_dataset = sim_dataset.map(
+        process_equal, cache_file_name=data_path+'/map_cache_en'+str(config.cycle))
+
+    if rank == 0:
+        cnt = sim_dataset.filter(lambda example: example['score'] == -1, 
+            cache_file_name=data_path+'/short_cache'+str(config.cycle)).num_rows
+        print(f'**********There are {cnt} Equal Sentence!**********')
+        cnt = sim_dataset.filter(lambda example: example['score'] == -2,
+            cache_file_name=data_path+'/long_cache'+str(config.cycle)).num_rows
+        print(f'**********There are {cnt} Short(<5) Sentence!**********')
+
+    if rank == 0 and config.cycle != -1:
+        torch.distributed.barrier()
+    
+    return sim_dataset
+
 def load_data(config, rank, is_labeled=False, is_score=False, attri=None):
     if is_labeled:
         if config.zero_shot == 1:
@@ -111,6 +139,8 @@ def load_data(config, rank, is_labeled=False, is_score=False, attri=None):
 
         if attri == 'gen':
             sim_dataset = preprocess_gen_data(config, rank, config.cache_data_path, sim_dataset)
+        elif attri == 'gen_en':
+            sim_dataset = preprocess_gen_data_en(config, rank, config.cache_data_path, sim_dataset)
 
     return sim_dataset
 
@@ -243,12 +273,12 @@ def set_dataset(config, use_label, use_gen, attri, rank):
 
     if config.pretrain_dis:
         train_data = datasets.load_from_disk(
-            '/cognitive_comp/wutong/source/sim_data/similarity_data_en/labeled_train_' + config.data_name)
-            # config.lab_data_path + config.data_name + '_train_ds')  # fine-tune
+            # '/cognitive_comp/wutong/source/sim_data/similarity_data_en/labeled_train_' + config.data_name)
+            config.lab_data_path + config.data_name + '_train_ds')  # fine-tune
         train_dataset = SimGanDataset(data=train_data)
         test_data = datasets.load_from_disk(
-            '/cognitive_comp/wutong/source/sim_data/similarity_data_en/labeled_test_' + config.data_name)
-            # config.test_data_path + config.data_name)  # fine-tune
+            # '/cognitive_comp/wutong/source/sim_data/similarity_data_en/labeled_test_' + config.data_name)
+            config.test_data_path + config.data_name)  # fine-tune
         val_dataset = SimGanDataset(data=test_data)
         
     elif config.pretrain_gen:

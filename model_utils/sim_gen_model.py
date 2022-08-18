@@ -3,7 +3,7 @@ import json
 import torch
 import torch.nn as nn
 from transformers import (
-    BertForSequenceClassification, OPTForCausalLM, 
+    AutoModelForSequenceClassification, OPTForCausalLM, 
     AlbertForSequenceClassification)
 
 from model_utils.gpt2_for_inference import GPT2Model
@@ -16,8 +16,8 @@ class Discriminator(nn.Module):
         super().__init__()
 
         if config.chinese:
-            self.dis = BertForSequenceClassification.from_pretrained(
-                config.model_path + config.discriminator, num_labels=2)
+            self.dis = AutoModelForSequenceClassification.from_pretrained(
+                config.discriminator_zh, num_labels=2)
         else:
             self.dis = AlbertForSequenceClassification.from_pretrained(
                 config.model_path + config.discriminator, num_labels=2)

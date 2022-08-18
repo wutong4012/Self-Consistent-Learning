@@ -41,12 +41,15 @@ def multiply_pre_score(config, raw_dataset, rank):
     )
     
     with torch.no_grad():
+        raw_text1, raw_text2 = [], []
         all_logits, text1, text2, scores = [], [], [], []
         for batch in dataloader:
             torch.cuda.empty_cache()
             logits = discriminator.forward(
                 batch['input_ids'].cuda(), None)
             all_logits.append(torch.softmax(logits, dim=1))
+            raw_text1.extend(batch['text1'])
+            raw_text2.extend(batch['text2'])
 
         threshold0 = config.min_thre0 + config.cycle * 0.07
         if threshold0 > config.max_thre0:
@@ -56,9 +59,9 @@ def multiply_pre_score(config, raw_dataset, rank):
             threshold1 = config.max_thre1
 
         all_logits = torch.cat(all_logits, dim=0)
-        assert all_logits.size(0) == raw_dataset.num_rows
+        assert all_logits.size(0) == len(raw_text1)
         
-        for idx in range(raw_dataset.num_rows):
+        for idx in range(len(raw_text1)):
             # 全协同
             # scores.append(1)
             # text1.append(raw_dataset['text1'][idx])
@@ -66,16 +69,16 @@ def multiply_pre_score(config, raw_dataset, rank):
             
             if all_logits[idx][0] >= threshold0:
                 scores.append(0)
-                text1.append(raw_dataset['text1'][idx])
-                text2.append(raw_dataset['text2'][idx])
+                text1.append(raw_text1[idx])
+                text2.append(raw_text2[idx])
             elif all_logits[idx][1] >= threshold1:
                 scores.append(1)
-                text1.append(raw_dataset['text1'][idx])
-                text2.append(raw_dataset['text2'][idx])
+                text1.append(raw_text1[idx])
+                text2.append(raw_text2[idx])
 
     discriminator.to('cpu')
     if rank == 0:
-        print(f'**********Origin Generate Data Samples is {raw_dataset.num_rows}**********')
+        print(f'**********Origin Generate Data Samples is {len(raw_text1)}**********')
         print(f'**********The Threshold 0 is {threshold0}**********')
         print(f'**********The Threshold 1 is {threshold1}**********')
         print(f'**********There are {scores.count(0)} Samples to be Selected 0!**********')
@@ -97,9 +100,9 @@ def gen_postprocess(output_dict, gen_tokenizer, config, rank):
     sim_sentence = gen_tokenizer.batch_decode(
         output_dict['ids_list'], skip_special_tokens=True)
 
+    raw_text, sim_text = [], []
     if config.chinese:
-        raw_text, sim_text, real_ppl_list = [], [], []
-        for idx, item in enumerate(sim_sentence):
+        for item in sim_sentence:
             if item.count('”的相似句是“') != 1 or (
                     item.count('“') % 2 != 0 or item.count('”') % 2 != 0):
                 continue
@@ -109,7 +112,6 @@ def gen_postprocess(output_dict, gen_tokenizer, config, rank):
             sim_text.append(item[1][:-1])
     
     else:
-        raw_text, sim_text = [], []
         for item in sim_sentence:
             item = item.split('\" is similar to \"')
             if len(item) != 2 or item[0][1:] == item[1][:-1]:
@@ -217,13 +219,14 @@ def gen_pred_collate(batch_data, gen_tokenizer, config):
 def dis_pred_collate(batch_data, dis_tokenizer):
     dis_input_ids, text1, text2 = [], [], []
     for item in batch_data:
-        text1.append(item['text1'])
-        text2.append(item['text2'])
-
         dis_text = item['text1'] + '[SEP]' + item['text2']
         input_ids = dis_tokenizer(
             dis_text, return_tensors='pt').input_ids.squeeze()
+        if len(input_ids) > 512:
+            continue
         dis_input_ids.append(input_ids)
+        text1.append(item['text1'])
+        text2.append(item['text2'])
 
     dis_input_ids = pad_sequence([x for x in dis_input_ids],
                                  batch_first=True, padding_value=0)
@@ -263,8 +266,8 @@ def process_gen_ds(config, rank):
         使用Generator生成的句子再作为预测的输入句子
     """
     gen_ds = datasets.load_from_disk(config.sim_data_path + f'/trainG_cycle_{config.cycle}')
-    if gen_ds.num_rows > 6000:
-        gen_ds = gen_ds.select(range(6000))
+    if gen_ds.num_rows > 5000:
+        gen_ds = gen_ds.select(range(5000))
     
     def process_gen(example):
         sentence_list = []
