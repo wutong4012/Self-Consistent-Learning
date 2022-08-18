@@ -3,11 +3,10 @@ import json
 import torch
 import torch.nn as nn
 from transformers import (
-    AutoModelForSequenceClassification, OPTForCausalLM, 
-    AlbertForSequenceClassification)
+    AutoModelForSequenceClassification, OPTForCausalLM)
 
-from model_utils.gpt2_for_inference import GPT2Model
-# from model_utils.gpt2_modeling import GPT2Model
+# from model_utils.gpt2_for_inference import GPT2Model
+from model_utils.gpt2_modeling import GPT2Model
 
 
 class Discriminator(nn.Module):
@@ -17,10 +16,10 @@ class Discriminator(nn.Module):
 
         if config.chinese:
             self.dis = AutoModelForSequenceClassification.from_pretrained(
-                config.discriminator_zh, num_labels=2)
+                config.pretrained_zh + config.discriminator_zh, num_labels=2)
         else:
-            self.dis = AlbertForSequenceClassification.from_pretrained(
-                config.model_path + config.discriminator, num_labels=2)
+            self.dis = AutoModelForSequenceClassification.from_pretrained(
+                config.pretrained_en + config.discriminator_en, num_labels=2)
         
         if config.pretrain_dis and not config.warm_up_model:
             return
@@ -30,14 +29,14 @@ class Discriminator(nn.Module):
             if config.cycle == 0 or config.cycle == -1:
                 if config.zero_shot == 1:
                     if config.chinese:
-                        pt_path = config.model_path + 'roberta_' + config.data_name + '0.pt'
+                        pt_path = config.pretrained_zh + config.discriminator_zh + '_' + config.data_name + '0.pt'
                     else:
-                        pt_path = config.model_path + 'albert_' + config.data_name + '0.pt'
+                        pt_path = config.pretrained_en + config.discriminator_en + '_' + config.data_name + '0.pt'
                 else:
                     if config.chinese:
-                        pt_path = config.model_path + 'roberta_' + config.data_name + '.pt'
+                        pt_path = config.pretrained_zh + config.discriminator_zh + '_' + config.data_name + '.pt'
                     else:
-                        pt_path = config.model_path + 'albert_' + config.data_name + '.pt'
+                        pt_path = config.pretrained_en + config.discriminator_en + '_' + config.data_name + '.pt'
                 print(f'The warm up model path is {pt_path}!')
             else:
                 pt_path = config.ckpt_model_path + \
@@ -107,7 +106,7 @@ class Generator(nn.Module):
         )
         
         if config.cycle == 0 or config.cycle == -1:
-            pt_path = config.model_path + 'txl_zh_5.0B.pt'
+            pt_path = config.txl_model_path
         else:
             pt_path = config.ckpt_model_path +\
                 f'/generator_cycle_{config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt'
@@ -151,10 +150,10 @@ class Generator_EN(nn.Module):
     def __init__(self, config) -> None:
         super().__init__()
         
-        self.gen = OPTForCausalLM.from_pretrained(config.model_path + 'opt-2.7b')
+        self.gen = OPTForCausalLM.from_pretrained(config.opt_model_path + 'opt-2.7b')
         
         if config.cycle == 0 or config.cycle == -1:
-            pt_path = config.model_path + 'opt-2.7b.pt'
+            pt_path = config.opt_model_path + 'opt-2.7b.pt'
         
         else:
             pt_path = config.ckpt_model_path +\

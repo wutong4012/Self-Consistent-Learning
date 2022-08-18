@@ -22,10 +22,10 @@ feats = datasets.Features({"text1": datasets.Value('string'),
 def multiply_pre_score(config, raw_dataset, rank):
     if config.chinese:
         dis_tokenizer = BertTokenizer.from_pretrained(
-            config.model_path + config.discriminator)
+            config.pretrained_zh + config.discriminator_zh)
     else:
         dis_tokenizer = AlbertTokenizer.from_pretrained(
-            config.model_path + config.discriminator)
+            config.pretrained_en + config.discriminator_en)
     discriminator = Discriminator(config).cuda().eval()
     
     predict_dataset = SimGanDataset(raw_dataset)

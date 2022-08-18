@@ -34,6 +34,7 @@ class GenSystem(LightningModule):
                 eos_token='<|endoftext|>',
                 pad_token='<|endoftext|>',
                 extra_ids=0)
+            self.gen_tokenizer.add_special_tokens({'bos_token': '<bos>'})
             self.generator = Generator(self.config)
 
         else:
@@ -144,7 +145,7 @@ class GenSystem(LightningModule):
         else:
             generate_ids = self.generator.gen.generate(
                 batch['input_ids'].cuda(), do_sample=True, top_p=self.config.top_p, max_length=200, 
-                num_return_sequences=self.config.gen_nums, repetition_penalty=self.config.repetition_penalty)
+                num_return_sequences=1, repetition_penalty=self.config.repetition_penalty)
             output_dict = {'ids_list': generate_ids}
 
         return output_dict
