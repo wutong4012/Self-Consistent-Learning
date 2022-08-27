@@ -8,7 +8,7 @@ import datasets
 from datasets import Dataset
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
-from transformers import BertTokenizer, AlbertTokenizer
+from transformers import AutoTokenizer, AlbertTokenizer
 
 from data_utlis.sim_gen_dataset import load_data, SimGanDataset
 from model_utils.sim_gen_model import Discriminator
@@ -21,7 +21,7 @@ feats = datasets.Features({"text1": datasets.Value('string'),
 
 def multiply_pre_score(config, raw_dataset, rank):
     if config.chinese:
-        dis_tokenizer = BertTokenizer.from_pretrained(
+        dis_tokenizer = AutoTokenizer.from_pretrained(
             config.pretrained_zh + config.discriminator_zh)
     else:
         dis_tokenizer = AlbertTokenizer.from_pretrained(
@@ -51,10 +51,10 @@ def multiply_pre_score(config, raw_dataset, rank):
             raw_text1.extend(batch['text1'])
             raw_text2.extend(batch['text2'])
 
-        threshold0 = config.min_thre0 + config.cycle * 0.07
+        threshold0 = config.min_thre0 + config.cycle * 0.04
         if threshold0 > config.max_thre0:
             threshold0 = config.max_thre0
-        threshold1 = config.min_thre1 + config.cycle * 0.07
+        threshold1 = config.min_thre1 + config.cycle * 0.04
         if threshold1 > config.max_thre1:
             threshold1 = config.max_thre1
 
@@ -113,6 +113,7 @@ def gen_postprocess(output_dict, gen_tokenizer, config, rank):
     
     else:
         for item in sim_sentence:
+            item = item.replace('\n', '')
             item = item.split('\" is similar to \"')
             if len(item) != 2 or item[0][1:] == item[1][:-1]:
                 continue
@@ -151,7 +152,7 @@ def dis_postprocess(dis_output_dict, config, rank):
     gc.collect()
     torch.cuda.empty_cache()
     
-    dis_threshold = config.min_dis_thre + (config.cycle + 1) * 0.07
+    dis_threshold = config.min_dis_thre + (config.cycle + 1) * 0.04
     if dis_threshold > config.max_dis_thre:
         dis_threshold = config.max_dis_thre
     if rank == 0:
@@ -229,7 +230,8 @@ def dis_pred_collate(batch_data, dis_tokenizer):
         text2.append(item['text2'])
 
     dis_input_ids = pad_sequence([x for x in dis_input_ids],
-                                 batch_first=True, padding_value=0)
+                                 batch_first=True, 
+                                 padding_value=dis_tokenizer.pad_token_id)
 
     return {
         'text1': text1,

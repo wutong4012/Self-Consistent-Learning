@@ -106,6 +106,7 @@ class Generator(nn.Module):
         )
         
         if config.cycle == 0 or config.cycle == -1:
+            print('Use Warm Up Model...')
             pt_path = config.txl_model_path
         else:
             pt_path = config.ckpt_model_path +\
@@ -153,6 +154,7 @@ class Generator_EN(nn.Module):
         self.gen = OPTForCausalLM.from_pretrained(config.opt_model_path + 'opt-2.7b')
         
         if config.cycle == 0 or config.cycle == -1:
+            print('Use Warm Up Model...')
             pt_path = config.opt_model_path + 'opt-2.7b.pt'
         
         else:

@@ -25,24 +25,22 @@ class SimGanDataset(Dataset):
     def __len__(self):
         return self.data.num_rows
 
+def LCS(str1, str2):
+    len_str1 = len(str1)
+    len_str2 = len(str2)
+    record = [[0 for i in range(len_str2 + 1)]
+                for j in range(len_str1 + 1)]
+    for i in range(len_str1):
+        for j in range(len_str2):
+            if str1[i] == str2[j]:
+                record[i + 1][j + 1] = record[i][j] + 1
+            elif record[i + 1][j] > record[i][j + 1]:
+                record[i + 1][j + 1] = record[i + 1][j]
+            else:
+                record[i + 1][j + 1] = record[i][j + 1]
+    return record[-1][-1]
 
 def preprocess_gen_data(config, rank, data_path, sim_dataset):
-
-    def LCS(str1, str2):
-        len_str1 = len(str1)
-        len_str2 = len(str2)
-        record = [[0 for i in range(len_str2 + 1)]
-                  for j in range(len_str1 + 1)]
-        for i in range(len_str1):
-            for j in range(len_str2):
-                if str1[i] == str2[j]:
-                    record[i + 1][j + 1] = record[i][j] + 1
-                elif record[i + 1][j] > record[i][j + 1]:
-                    record[i + 1][j + 1] = record[i + 1][j]
-                else:
-                    record[i + 1][j + 1] = record[i][j + 1]
-        return record[-1][-1]
-
     def process_equal(example):
         if len(example['text2']) < 5:  # 最小长度设为5
             example['score'] = -1
@@ -81,10 +79,13 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
 
 def preprocess_gen_data_en(config, rank, data_path, sim_dataset):
     def process_equal(example):
-        if (example['text2'] in example['text1']) or (example['text1'] in example['text2']):
-            example['score'] = -1
-        elif len(example['text2'].split(' ')) < 5:  # 最小长度设为5
+        if len(example['text2'].split(' ')) < 5:  # 最小长度设为5
             example['score'] = -2
+        else:
+            text1, text2 = example['text1'].lower(), example['text2'].lower()
+            delta = min(len(text1), len(text2)) - LCS(text1, text2)
+            if delta <= 3:
+                example['score'] = -1
         return example
 
     if rank > 0:
@@ -110,8 +111,12 @@ def preprocess_gen_data_en(config, rank, data_path, sim_dataset):
 def load_data(config, rank, is_labeled=False, is_score=False, attri=None):
     if is_labeled:
         if config.zero_shot == 1:
-            sim_dataset = datasets.load_from_disk(
-                '/cognitive_comp/wutong/source/sim_data/similarity_data_en/labeled4' + config.data_name)  #  / _en
+            if config.chinese:
+                sim_dataset = datasets.load_from_disk(
+                    '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled4' + config.data_name)
+            else:
+                sim_dataset = datasets.load_from_disk(
+                    '/cognitive_comp/wutong/source/sim_data/similarity_data_en/labeled4' + config.data_name)
         else:
             sim_dataset = datasets.load_from_disk(
                 config.lab_data_path + config.data_name + '_train_ds')
@@ -272,13 +277,15 @@ def set_dataset(config, use_label, use_gen, attri, rank):
                     config, rank, part_labeled_data, generated_data)
 
     if config.pretrain_dis:
-        train_data = datasets.load_from_disk(
-            # '/cognitive_comp/wutong/source/sim_data/similarity_data_en/labeled_train_' + config.data_name)
-            config.lab_data_path + config.data_name + '_train_ds')  # fine-tune
+        if config.zero_shot:
+            train_data = datasets.load_from_disk(
+                '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled_train_' + config.data_name)
+            test_data = datasets.load_from_disk(
+                '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled_test_' + config.data_name)
+        else:
+            train_data = datasets.load_from_disk(config.lab_data_path + config.data_name + '_train_ds') 
+            test_data = datasets.load_from_disk(config.test_data_path + config.data_name)
         train_dataset = SimGanDataset(data=train_data)
-        test_data = datasets.load_from_disk(
-            # '/cognitive_comp/wutong/source/sim_data/similarity_data_en/labeled_test_' + config.data_name)
-            config.test_data_path + config.data_name)  # fine-tune
         val_dataset = SimGanDataset(data=test_data)
         
     elif config.pretrain_gen:

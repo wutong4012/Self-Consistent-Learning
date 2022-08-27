@@ -39,7 +39,7 @@ class GenSystem(LightningModule):
 
         else:
             self.gen_tokenizer = GPT2Tokenizer.from_pretrained(
-                self.config.model_path + 'opt-2.7b')
+                self.config.opt_model_path + 'opt-2.7b')
             self.generator = Generator_EN(self.config)
 
 

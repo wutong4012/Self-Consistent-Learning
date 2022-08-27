@@ -1,7 +1,7 @@
 import torch
 from pytorch_lightning import LightningModule
-from transformers import AutoTokenizer
-from transformers.optimization import AdamW, get_cosine_schedule_with_warmup
+from transformers import AutoTokenizer, AlbertTokenizer
+from transformers.optimization import AdamW, get_cosine_schedule_with_warmup, get_constant_schedule
 
 from data_utlis.predict_dataset import create_predict_dataloader
 from data_utlis.sim_gen_dataset import (create_dataloader, set_dataset)
@@ -28,7 +28,7 @@ class DisSystem(LightningModule):
                 self.config.pretrained_zh + self.config.discriminator_zh)
         
         else:
-            self.dis_tokenizer = AutoTokenizer.from_pretrained(
+            self.dis_tokenizer = AlbertTokenizer.from_pretrained(
                 self.config.pretrained_en + self.config.discriminator_en)
         
         self.discriminator = Discriminator(self.config)
@@ -61,6 +61,7 @@ class DisSystem(LightningModule):
             num_warmup_steps=int(self.config.warmup_steps),
             num_training_steps=self.config.dis_train_steps
         )
+        # scheduler = get_constant_schedule(optimizer=optimizer)
 
         # Must be written strictly according to the specification! ! !
         return {

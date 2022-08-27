@@ -130,7 +130,8 @@ def discriminator_collate_fn(batch_data, tokenizer, is_train):
         labels.append(torch.tensor(item['score'], dtype=torch.long))
 
     dis_text_input_ids = pad_sequence([x for x in dis_text_input_ids],
-                                      batch_first=True, padding_value=0)
+                                      batch_first=True, 
+                                      padding_value=tokenizer.pad_token_id)
 
     return {
         'dis_text_input_ids': dis_text_input_ids,
