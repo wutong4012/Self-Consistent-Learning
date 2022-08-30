@@ -144,7 +144,7 @@ class GenSystem(LightningModule):
             )
         else:
             generate_ids = self.generator.gen.generate(
-                batch['input_ids'].cuda(), do_sample=True, top_p=self.config.top_p, max_length=200, 
+                batch['input_ids'].cuda(), do_sample=True, top_p=self.config.top_p, max_new_tokens=200, 
                 num_return_sequences=1, repetition_penalty=self.config.repetition_penalty)
             output_dict = {'ids_list': generate_ids}
 

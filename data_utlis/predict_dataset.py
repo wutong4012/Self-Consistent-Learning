@@ -51,10 +51,10 @@ def multiply_pre_score(config, raw_dataset, rank):
             raw_text1.extend(batch['text1'])
             raw_text2.extend(batch['text2'])
 
-        threshold0 = config.min_thre0 + config.cycle * 0.04
+        threshold0 = config.min_thre0 + config.cycle * config.add_thre
         if threshold0 > config.max_thre0:
             threshold0 = config.max_thre0
-        threshold1 = config.min_thre1 + config.cycle * 0.04
+        threshold1 = config.min_thre1 + config.cycle * config.add_thre
         if threshold1 > config.max_thre1:
             threshold1 = config.max_thre1
 
@@ -62,19 +62,20 @@ def multiply_pre_score(config, raw_dataset, rank):
         assert all_logits.size(0) == len(raw_text1)
         
         for idx in range(len(raw_text1)):
-            # 全协同
-            # scores.append(1)
-            # text1.append(raw_dataset['text1'][idx])
-            # text2.append(raw_dataset['text2'][idx])
-            
-            if all_logits[idx][0] >= threshold0:
-                scores.append(0)
-                text1.append(raw_text1[idx])
-                text2.append(raw_text2[idx])
-            elif all_logits[idx][1] >= threshold1:
+            if config.consistency:
                 scores.append(1)
-                text1.append(raw_text1[idx])
-                text2.append(raw_text2[idx])
+                text1.append(raw_dataset['text1'][idx])
+                text2.append(raw_dataset['text2'][idx])
+            
+            else:
+                if all_logits[idx][0] >= threshold0:
+                    scores.append(0)
+                    text1.append(raw_text1[idx])
+                    text2.append(raw_text2[idx])
+                elif all_logits[idx][1] >= threshold1:
+                    scores.append(1)
+                    text1.append(raw_text1[idx])
+                    text2.append(raw_text2[idx])
 
     discriminator.to('cpu')
     if rank == 0:
@@ -152,7 +153,7 @@ def dis_postprocess(dis_output_dict, config, rank):
     gc.collect()
     torch.cuda.empty_cache()
     
-    dis_threshold = config.min_dis_thre + (config.cycle + 1) * 0.04
+    dis_threshold = config.min_dis_thre + (config.cycle + 1) * config.add_thre
     if dis_threshold > config.max_dis_thre:
         dis_threshold = config.max_dis_thre
     if rank == 0:

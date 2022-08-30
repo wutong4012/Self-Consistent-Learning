@@ -90,9 +90,9 @@ def sample_sequence_batch(model, context_tokens_tensor, context_length_tensor, m
     if max_out_seq is None:
         max_out_seq = 512
     log_probs_tensor = torch.tensor([0.0] * batch_size)
+    count_num = torch.tensor([0] * batch_size)
     output_tokens_lists, log_probs_list = [], []
     with torch.no_grad():
-        # while counter < (max_out_seq - org_context_length):
         while counter < max_out_seq:
             index = org_context_length + counter
             if counter == 0:
@@ -107,18 +107,21 @@ def sample_sequence_batch(model, context_tokens_tensor, context_length_tensor, m
             if repetition_penalty != 1.0:
                 for bz in range(batch_size):
                     enforce_repetition_penalty(logits[bz, :], tokens[bz, :], repetition_penalty)
-            log_probs = F.softmax(logits, dim=-1)  # [bs, vocab_size]
-
-            prev = torch.multinomial(log_probs, num_samples=1).view(-1)  # [bs]
+            probs = F.softmax(logits, dim=-1)  # [bs, vocab_size]
+            
+            prev = torch.multinomial(probs, num_samples=1).view(-1)  # [bs]
 
             if index < torch.max(context_length_tensor).item():
                 prev = switch(
                     prev, context_tokens_tensor[:, index], context_length_tensor <= index)
             for i in range(batch_size):
-                if index > context_length_tensor[i] and prev[i] != end_token_id:
-                    log_probs_tensor[i] += math.log(log_probs[i][prev][i] + 1e-6)
+                if index > context_length_tensor[i] and prev[i] != end_token_id and probs[i][prev[i]] != 0:
+                    log_probs_tensor[i] += math.log(probs[i][prev[i]])
+                    # log_probs_tensor[i] += probs[i][prev[i]].item()
+                    count_num[i] += 1
                 if prev[i] == end_token_id:
-                    log_probs_tensor[i] /= (context_length_tensor[i].cpu() - index)
+                    # log_probs_tensor[i] /= (-count_num[i])
+                    log_probs_tensor[i] /= count_num[i]
 
             if torch.all(prev == end_token_id).item():
                 break
@@ -132,7 +135,10 @@ def sample_sequence_batch(model, context_tokens_tensor, context_length_tensor, m
             tokens, prev = tokens[conti_idx], prev[conti_idx]
             context_tokens_tensor = context_tokens_tensor[conti_idx]
             context_length_tensor = context_length_tensor[conti_idx]
+            
             log_probs_tensor = log_probs_tensor[conti_idx]
+            count_num = count_num[conti_idx]
+            
             batch_size = tokens.shape[0]
             for im in range(len(mems)):
                 mems[im] = mems[im][conti_idx, :, :]
@@ -146,9 +152,11 @@ def sample_sequence_batch(model, context_tokens_tensor, context_length_tensor, m
     output_tokens_lists = [tokens[:tokens.index(
         end_token_id)] if end_token_id in tokens else tokens for tokens in output_tokens_lists]
     ppl_list = [math.exp(i) for i in log_probs_list]
+    # log_probs_list = [i.item() for i in log_probs_list]
     return {
         'ids_list': output_tokens_lists,
         'ppl_list': ppl_list,
+        # 'prob_list': log_probs_list,
     }
 
 

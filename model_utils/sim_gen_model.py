@@ -151,7 +151,7 @@ class Generator_EN(nn.Module):
     def __init__(self, config) -> None:
         super().__init__()
         
-        self.gen = OPTForCausalLM.from_pretrained(config.opt_model_path + 'opt-2.7b')
+        self.gen = OPTForCausalLM.from_pretrained(config.opt_model_path + 'opt-2.7b')  # opt-350m / opt-2.7b
         
         if config.cycle == 0 or config.cycle == -1:
             print('Use Warm Up Model...')
