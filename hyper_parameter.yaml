@@ -26,7 +26,7 @@ dis_batch_size: 16  # en-24 / zh-128  ####
 gen_batch_size: 2
 gen_big_batch_size: 30
 gen_en_batch_size: 24  # pre-4 / 24
-pre_gen_bs: 160  # 160-en / zh-512
+pre_gen_bs: 100  # 100-en / zh-512
 pre_dis_bs: 96    # en-96 / zh-384
 
 val_me: False

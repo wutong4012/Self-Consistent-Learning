@@ -114,13 +114,12 @@ def gen_postprocess(output_dict, gen_tokenizer, config, rank):
     
     else:
         for item in sim_sentence:
-            item = item.replace('\n', '')
-            item = item.split('\" is similar to \"')
+            item = item.replace('\n', '').split('\" is similar to \"')
             if len(item) != 2 or item[0][1:] == item[1][:-1]:
                 continue
             
             raw_text.append(item[0][1:])
-            sim_text.append(item[1][:-1])
+            sim_text.append(item[1].split('"')[0])
 
     raw_dataset = Dataset.from_dict({
         'text1': raw_text,

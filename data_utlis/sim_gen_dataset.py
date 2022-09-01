@@ -44,7 +44,7 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
     def process_equal(example):
         if len(example['text2']) < 5:  # 最小长度设为5
             example['score'] = -1
-        elif len(example['text2']) > 100:  # 最大长度设为50
+        elif len(example['text2']) > 80:  # 最大长度设为50
             example['score'] = -2
         else:
             delta = min(len(example['text1']), len(example['text2'])) \
