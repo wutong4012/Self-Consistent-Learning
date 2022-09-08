@@ -24,8 +24,12 @@ def multiply_pre_score(config, raw_dataset, rank):
         dis_tokenizer = AutoTokenizer.from_pretrained(
             config.pretrained_zh + config.discriminator_zh)
     else:
-        dis_tokenizer = AlbertTokenizer.from_pretrained(
-            config.pretrained_en + config.discriminator_en)
+        if config.discriminator_en == 'albert_xxlarge':
+            dis_tokenizer = AlbertTokenizer.from_pretrained(
+                config.pretrained_en + config.discriminator_en)
+        else:
+            dis_tokenizer = AutoTokenizer.from_pretrained(
+                config.pretrained_en + config.discriminator_en)
     discriminator = Discriminator(config).cuda().eval()
     
     predict_dataset = SimGanDataset(raw_dataset)
@@ -119,7 +123,10 @@ def gen_postprocess(output_dict, gen_tokenizer, config, rank):
                 continue
             
             raw_text.append(item[0][1:])
-            sim_text.append(item[1].split('"')[0])
+            if '"' in item[0][1:]:
+                sim_text.append(item[1][:-1])
+            else:
+                sim_text.append(item[1].split('"')[0])
 
     raw_dataset = Dataset.from_dict({
         'text1': raw_text,

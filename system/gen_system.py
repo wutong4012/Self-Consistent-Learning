@@ -147,7 +147,7 @@ class GenSystem(LightningModule):
             output_dict = sample_sequence_batch_en(
                 model=self.generator.gen, context_tokens_tensor=batch['input_ids'].cuda(),
                 context_length_tensor=batch['length_tensor'], repetition_penalty=self.config.repetition_penalty,
-                max_out_seq=80, end_token_id=2, temperature=1.0, top_k=self.config.top_k, top_p=self.config.top_p,
+                max_out_seq=100, end_token_id=2, temperature=1.0, top_k=self.config.top_k, top_p=self.config.top_p,
             )
 
         return output_dict

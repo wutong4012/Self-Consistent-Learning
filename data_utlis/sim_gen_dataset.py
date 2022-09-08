@@ -44,7 +44,7 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
     def process_equal(example):
         if len(example['text2']) < 5:  # 最小长度设为5
             example['score'] = -1
-        elif len(example['text2']) > 80:  # 最大长度设为50
+        elif len(example['text2']) > 80:  # 最大长度设为80
             example['score'] = -2
         else:
             delta = min(len(example['text1']), len(example['text2'])) \
@@ -79,7 +79,7 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
 
 def preprocess_gen_data_en(config, rank, data_path, sim_dataset):
     def process_equal(example):
-        if len(example['text2'].split(' ')) < 5:  # 最小长度设为5
+        if len(example['text1'].split(' ')) > 5 and len(example['text2'].split(' ')) < 5:  # 最小长度设为5
             example['score'] = -2
         else:
             text1, text2 = example['text1'].lower(), example['text2'].lower()

@@ -77,8 +77,8 @@ def generator_cycle(config):
 def discriminator_cycle(config):
     dis_ckpt_callback = ModelCheckpoint(
         save_top_k=1,
-        monitor='dis_val_loss',
-        mode='min',
+        monitor='dis_val_loss',  # dis_f1_score / dis_val_loss
+        mode='min',  # max / min
         filename=f'discriminator_cycle_{config.cycle + 1}',
         dirpath=config.ckpt_model_path,
     )

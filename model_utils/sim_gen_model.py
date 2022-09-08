@@ -5,7 +5,6 @@ import torch.nn as nn
 from transformers import (
     AutoModelForSequenceClassification, OPTForCausalLM)
 
-# from model_utils.gpt2_for_inference import GPT2Model
 from model_utils.gpt2_modeling import GPT2Model
 
 

@@ -1,4 +1,5 @@
 import torch
+from sklearn.metrics import f1_score
 from pytorch_lightning import LightningModule
 from transformers import AutoTokenizer, AlbertTokenizer
 from transformers.optimization import AdamW, get_cosine_schedule_with_warmup, get_constant_schedule
@@ -28,8 +29,12 @@ class DisSystem(LightningModule):
                 self.config.pretrained_zh + self.config.discriminator_zh)
         
         else:
-            self.dis_tokenizer = AlbertTokenizer.from_pretrained(
-                self.config.pretrained_en + self.config.discriminator_en)
+            if self.config.discriminator_en == 'albert_xxlarge':
+                self.dis_tokenizer = AlbertTokenizer.from_pretrained(
+                    self.config.pretrained_en + self.config.discriminator_en)
+            else:
+                self.dis_tokenizer = AutoTokenizer.from_pretrained(
+                    self.config.pretrained_en + self.config.discriminator_en)
         
         self.discriminator = Discriminator(self.config)
 
@@ -93,6 +98,10 @@ class DisSystem(LightningModule):
             batch['labels'].cuda()
         )
         self.log('dis_val_loss', loss.item())
+        
+        predictions = torch.argmax(logits, dim=1)
+        f1 = f1_score(batch['labels'].cpu(), predictions.cpu())
+        self.log('dis_f1_score', f1)
 
         return loss
 

@@ -22,7 +22,7 @@ std_scale: 1.2
 repetition_penalty: 1.0
 
 gen_repeat_times: 1  # 每条句子重复生成的次数-zh
-dis_batch_size: 16  # en-24 / zh-128  ####
+dis_batch_size: 32  # en-24 / zh-128  ####
 gen_batch_size: 2
 gen_big_batch_size: 30
 gen_en_batch_size: 24  # pre-4 / 24
