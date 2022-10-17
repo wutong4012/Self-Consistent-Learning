@@ -1,7 +1,7 @@
 import torch
 from torch.nn import functional as F
 from torch.nn.utils.rnn import pad_sequence
-from data_utlis.noisy_input_ids import mask_tokens, noisy
+from data_utlis.noisy_input_ids import noisy
 
 
 def padding_dis_mask(mam: list, max_length):
@@ -43,7 +43,7 @@ def generator_collate_fn(batch_data, tokenizer, real_batch_size, is_train):
         model_inputs: {nosiy_text1, text2}
         prompt: “<第一句>”的相似句是“<第二句>”<eos>
     """
-    max_length, total_num = 400, 0
+    max_length, total_num = 512, 0
     prompts, lengths, attention_mask = [], [], []
     prompts_input_ids, lengths_input_ids, prompts_attention_mask = [], [], []
     for item in batch_data:
@@ -134,7 +134,7 @@ def discriminator_collate_fn(batch_data, tokenizer):
         clslabels.append(item['clslabels'])
         clslabels_mask.append(item['clslabels_mask'])
         mlmlabels_mask.append(item['mlmlabels_mask'])
-        # label_idx.append(item['label_idx'])
+        label_idx.append(item['label_idx'])
         sentence1.append(item['sentence1'])
         sentence2.append(item['sentence2'])
     
@@ -155,55 +155,7 @@ def discriminator_collate_fn(batch_data, tokenizer):
             "clslabels": torch.stack(clslabels),
             "clslabels_mask": clslabels_mask,
             "mlmlabels_mask": mlmlabels_mask,
-            # 'label_idx': torch.stack(label_idx),
+            'label_idx': torch.stack(label_idx),
             'sentence1': sentence1,
             'sentence2': sentence2
         }
-
-
-def generator_en_collate_fn(batch_data, tokenizer, is_train):
-    """
-        function_inputs: {text1, text2}
-        model_inputs: {nosiy_text1, text2}
-        prompt: "<text1>" is similar to "<text2>"
-    """
-    input_ids, lengths = [], []
-    for item in batch_data:
-        if is_train:
-            text1 = tokenizer(item['text1'], return_tensors='pt').input_ids
-            noisy_text1 = noisy(x=text1, drop_prob=0, sub_prob=0.05, shuffle_dist=0, 
-                                bos_token=2, pad_token=1, vocab_size=50272)
-            try:
-                item['text1'] = tokenizer.decode(noisy_text1.squeeze(), skip_special_tokens=True)
-            except TypeError:
-                pass
-        if item['text2'] == 'general':
-            prompt_text = item['text1']
-            prompt = tokenizer(prompt_text, return_tensors='pt')
-            # 太长只取前400个token
-            prompt_input_ids = torch.cat((prompt.input_ids.squeeze()[1:400], torch.tensor([2])))
-            length = torch.tensor([1 / len(prompt_input_ids)] * len(prompt_input_ids))
-            
-        else:
-            prompt_text = '"' + item['text1'] + '" is similar to "' + item['text2'] + '"'
-            prompt = tokenizer(prompt_text, return_tensors='pt')
-            if len(prompt.input_ids.squeeze()) > 512:
-                continue
-            # 因为<bos>和<eos>的token id一样，所以去掉自动添加的<bos>, 并手动添加<eos>
-            prompt_input_ids = torch.cat((prompt.input_ids.squeeze()[1:], torch.tensor([2])))
-
-            # 自动加了<bos>, 等效于手动加了<eos>, 长度不变
-            text2_ids = tokenizer(item['text2'] + '"', return_tensors='pt').input_ids.squeeze()
-            length = torch.tensor(
-                [0] * (len(prompt_input_ids) - len(text2_ids)) + [1 / len(text2_ids)] * len(text2_ids))
-
-        input_ids.append(prompt_input_ids)
-        lengths.append(length)
-        
-    input_ids = pad_sequence([x for x in input_ids], batch_first=True, padding_value=1)
-    lengths = pad_sequence([x for x in lengths], batch_first=True, padding_value=0)
-
-    return {
-        'input_ids': input_ids,
-        'lengths': lengths
-    }

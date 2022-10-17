@@ -2,61 +2,42 @@ seed: 42
 exp_dir: /cognitive_comp/wutong/similarity_generation/experiments/
 txl_config_path: /cognitive_comp/wutong/similarity_generation/model_utils/txl_1.1B_config.json
 txl_model_path: /cognitive_comp/wutong/source/model_base/model_zh/txl_zh_1.1B.pt
-opt_model_path: /cognitive_comp/wutong/source/model_base/model_en/
-
-pretrained_zh: /cognitive_comp/wutong/source/model_base/pretrained_zh/
-pretrained_en: /cognitive_comp/wutong/source/model_base/pretrained_en/
 sp_model_path: /cognitive_comp/wutong/source/model_base/chinese_sentencepiece/cog-pretrain.model
-
-test_sentence_path: /cognitive_comp/wutong/source/sim_data/predict_sentences/
-test_data_path: /cognitive_comp/wutong/source/sim_data/sim_test_data/
-lab_data_path: /cognitive_comp/wutong/source/sim_data/sim_train_data/
 
 ckpt_model_path: /cognitive_comp/wutong/similarity_generation/experiments/lightning_logs/checkpoints/
 sim_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_data/
-cache_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_cache/
+
+data_path: /cognitive_comp/wutong/source/sim_data/raw_data/bustm
+dis_model_path: /cognitive_comp/wutong/source/model_base/pretrained_zh/macbert_large_mc
+dis_ckpt_path: /cognitive_comp/wutong/finetune_large.bin
 
 top_k: 0
 top_p: 0.95
-std_scale: 1.2
 repetition_penalty: 1.0
 
-gen_repeat_times: 1  # 每条句子重复生成的次数-zh
-dis_batch_size: 128  # en-24 / zh-128  ####  256 / 384
-gen_batch_size: 16
-gen_big_batch_size: 200
-gen_en_batch_size: 24  # pre-4 / 24
-pre_gen_bs: 1024  # 100-en / zh-512
-pre_dis_bs: 1024    # en-96 / zh-384
+dis_batch_size: 128
+gen_batch_size: 6
+gen_big_batch_size: 100
+pre_gen_bs: 1024
+pre_dis_bs: 512
 
-val_me: False
-val_check: False
-dis_balance: True
-dis_use_label: True
-warm_up_model: True  ####
-pretrain_gen: False  ####
-pretrain_dis: False  ####
-chinese: 0  ####
-consistency: 0
+max_thre0: 0.95
+min_thre0: 0.9
+max_thre1: 0.95
+min_thre1: 0.9
+max_dis_thre: 0.95
+min_dis_thre: 0.85
+add_thre: 0.01
 
 dis_hidden_size: 1024
-discriminator_en: albert_xxlarge
-discriminator_zh: albert_xxlarge
-bustm_model: macbert_large_mc   # ernie_base_mc / macbert_large_mc
-model_version: finetune_large.bin   # finetune_large.bin / finetune_base.bin
-
-learning_rate: 2e-5 ##
-cycle_num: 10  ####
-cycle: -1  ####
-idx: -1
-start: 0 
+learning_rate: 1e-6
+cycle_num: 5
+cycle: -1
+start: 0
 end: 0
-sentence_num: 5000
+sentence_num: 3000
 
-gen_train_steps: 400 
-dis_train_steps: 600  ####
-warmup_steps: 40  ####
+gen_train_steps: 50
+dis_train_steps: 100
+warmup_steps: 10
 es_patience: 1
-
-vae2gen: False
-txl2gen: True

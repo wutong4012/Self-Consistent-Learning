@@ -6,8 +6,7 @@ import numpy as np
 from torch.utils.data import DataLoader, Dataset
 
 from data_utlis.sim_data_collate import (discriminator_collate_fn,
-                                         generator_collate_fn,
-                                         generator_en_collate_fn)
+                                         generator_collate_fn)
 
 
 def preprocess(sample):
@@ -223,7 +222,7 @@ class SimGanDataset(Dataset):
             "position_ids": torch.tensor(position_ids).long(),
             "mlmlabels": torch.tensor(target).long(),
             "clslabels": torch.tensor(clslabels).long(),
-            # 'label_idx': torch.tensor(label_idx).long(),
+            'label_idx': torch.tensor(label_idx).long(),
             "clslabels_mask": torch.tensor(clslabels_mask).float(),
             "mlmlabels_mask": torch.tensor(mlmlabels_mask).float(),
             'sentence1': item['sentence1'],
@@ -250,7 +249,7 @@ def LCS(str1, str2):
     return record[-1][-1]
 
 
-def preprocess_gen_data(config, rank, data_path, sim_dataset):
+def preprocess_gen_data(sim_dataset):
     def process_equal(example):
         if len(example['sentence2']) < 2:  # 最小长度设为2
             example['label'] = -1
@@ -263,240 +262,103 @@ def preprocess_gen_data(config, rank, data_path, sim_dataset):
                 example['label'] = -3
         return example
 
-    if rank > 0:
-        print(f'Rank {rank} waiting for main process to perform the mapping')
-        torch.distributed.barrier()
+    sim_dataset = sim_dataset.map(process_equal)
 
-    sim_dataset = sim_dataset.map(
-        process_equal, cache_file_name=data_path+'/map_cache'+str(config.cycle))
-
-    if rank == 0:
-        cnt = sim_dataset.filter(lambda example: example['label'] == -1,
-                                 cache_file_name=data_path+'/short_cache'+str(config.cycle)).num_rows
-        print(f'**********There are {cnt} Short(<2) Sentence!**********')
-        cnt = sim_dataset.filter(lambda example: example['label'] == -2,
-                                 cache_file_name=data_path+'/long_cache'+str(config.cycle)).num_rows
-        print(f'**********There are {cnt} Long(>50) Sentence!**********')
-        cnt = sim_dataset.filter(lambda example: example['label'] == -3,
-                                 cache_file_name=data_path+'/bad_cache'+str(config.cycle)).num_rows
-        print(f'**********There are {cnt} Bad Sentence!**********')
-
-    if rank == 0 and config.cycle != -1:
-        torch.distributed.barrier()
+    cnt = sim_dataset.filter(lambda example: example['label'] == -1)
+    print(f'**********There are {cnt} Short(<2) Sentence!**********')
+    cnt = sim_dataset.filter(lambda example: example['label'] == -2)
+    print(f'**********There are {cnt} Long(>50) Sentence!**********')
+    cnt = sim_dataset.filter(lambda example: example['label'] == -3)
+    print(f'**********There are {cnt} Bad Sentence!**********')
 
     return sim_dataset
 
 
-def preprocess_gen_data_en(config, rank, data_path, sim_dataset):
-    def process_equal(example):
-        if len(example['text1'].split(' ')) > 5 and len(example['text2'].split(' ')) < 5:  # 最小长度设为5
-            example['label'] = -2
-        else:
-            text1, text2 = example['text1'].lower(), example['text2'].lower()
-            delta = min(len(text1), len(text2)) - LCS(text1, text2)
-            if delta <= 3:
-                example['label'] = -1
-        return example
-
-    if rank > 0:
-        print(f'Rank {rank} waiting for main process to perform the mapping')
-        torch.distributed.barrier()
-
-    sim_dataset = sim_dataset.map(
-        process_equal, cache_file_name=data_path+'/map_cache_en'+str(config.cycle))
-
-    if rank == 0:
-        cnt = sim_dataset.filter(lambda example: example['label'] == -1,
-                                 cache_file_name=data_path+'/short_cache'+str(config.cycle)).num_rows
-        print(f'**********There are {cnt} Equal Sentence!**********')
-        cnt = sim_dataset.filter(lambda example: example['label'] == -2,
-                                 cache_file_name=data_path+'/long_cache'+str(config.cycle)).num_rows
-        print(f'**********There are {cnt} Short(<5) Sentence!**********')
-
-    if rank == 0 and config.cycle != -1:
-        torch.distributed.barrier()
-
-    return sim_dataset
-
-
-def load_data(config, rank, is_labeled=False, is_score=False, attri=None):
+def load_data(config, is_labeled=False, is_score=False, attri=None):
     if is_labeled:
-        sim_dataset = datasets.Dataset.from_json(
-            '/cognitive_comp/wutong/source/sim_data/raw_data/bustm/train_0.json')
+        sim_dataset = datasets.Dataset.from_json(config.data_path + '/train.json')  ### data_path
         sim_dataset = sim_dataset.remove_columns(['id'])
         feats = datasets.Features({"sentence1": datasets.Value('string'),
-                                    "sentence2": datasets.Value('string'),
-                                    "label": datasets.Value('int8')})
+                                   "sentence2": datasets.Value('string'),
+                                   "label": datasets.Value('int8')})
         sim_dataset = sim_dataset.map(features=feats)
 
     else:
         if attri == 'dis':
             if is_score:
-                data_path = config.sim_data_path + \
-                    '/score_cycle_{}'.format(config.cycle + 1)
+                data_path = config.sim_data_path + '/score_cycle_{}'.format(config.cycle + 1)
             else:
-                data_path = config.sim_data_path + \
-                    '/trainD_cycle_{}'.format(config.cycle)
+                data_path = config.sim_data_path + '/trainD_cycle_{}'.format(config.cycle)
 
-        elif attri == 'gen' or attri == 'gen_en':
-            data_path = config.sim_data_path + \
-                '/trainG_cycle_{}'.format(config.cycle)
+        elif attri == 'gen':
+            data_path = config.sim_data_path + '/trainG_cycle_{}'.format(config.cycle)
 
-        if rank == 0:
-            print(f'Data Path: {data_path} !')
+        print(f'Data Path: {data_path} !')
         sim_dataset = datasets.load_from_disk(data_path)
 
         if attri == 'gen':
-            sim_dataset = preprocess_gen_data(
-                config, rank, config.cache_data_path, sim_dataset)
-        elif attri == 'gen_en':
-            sim_dataset = preprocess_gen_data_en(
-                config, rank, config.cache_data_path, sim_dataset)
+            sim_dataset = preprocess_gen_data(sim_dataset)
 
     return sim_dataset
 
 
-def set_dis_dataset(config, rank, labeled_data, generated_data):
+def set_dis_dataset(labeled_data, generated_data):
     assert labeled_data.features.type == generated_data.features.type
 
     data = datasets.concatenate_datasets([labeled_data, generated_data])
 
-    if rank == 0:
-        print('**********All Positive Samples: ', data.filter(
-            lambda example: example['label'] == 1,
-            cache_file_name=config.cache_data_path+'/all_pos_cache_'+str(config.cycle)).num_rows)
-        print('**********All Negtive Samples: ', data.filter(
-            lambda example: example['label'] == 0,
-            cache_file_name=config.cache_data_path+'/all_neg_cache_'+str(config.cycle)).num_rows)
+    print('**********All Positive Samples: ', data.filter(lambda example: example['label'] == 1))
+    print('**********All Negtive Samples: ', data.filter(lambda example: example['label'] == 0))
 
     return data
 
 
-def set_gen_dataset(config, rank, labeled_data, generated_data):
-    if rank > 0:
-        print(f'Rank {rank} waiting for main process to perform the filtering')
-        torch.distributed.barrier()
-
-    labeled_data = labeled_data.filter(
-        lambda example: example['label'] == 1,
-        cache_file_name=config.cache_data_path+'/lab2gen_cache_'+str(config.cycle))
-    generated_data = generated_data.filter(
-        lambda example: example['label'] == 1,
-        cache_file_name=config.cache_data_path+'/gen2gen_cache_'+str(config.cycle))
-
-    if rank == 0:
-        torch.distributed.barrier()
+def set_gen_dataset(labeled_data, generated_data):
+    labeled_data = labeled_data.filter(lambda example: example['label'] == 1)
+    generated_data = generated_data.filter(lambda example: example['label'] == 1)
 
     data = datasets.concatenate_datasets([labeled_data, generated_data])
 
-    if rank == 0:
-        print(f'**********All Gen-Data Samples is {data.num_rows}**********')
-        print(
-            f'**********{generated_data.num_rows} Filter Samples From Generated Data**********')
+    print(f'**********All Gen-Data Samples is {data.num_rows}**********')
+    print(f'**********{generated_data.num_rows} Filter Samples From Generated Data**********')
 
     return data
 
 
-def set_dataset(config, use_label, use_gen, attri, rank, dis_tokenizer=None):
-    if not config.pretrain_dis and not config.pretrain_gen:
-        if use_gen and not use_label:
-            generated_data = load_data(
-                config, rank, is_labeled=False, attri=attri)
+def set_dataset(config, attri, dis_tokenizer=None):
+    labeled_data = load_data(config, is_labeled=True)
+    generated_data = load_data(config, is_labeled=False, attri=attri)
 
-            if attri == 'dis':
-                data = generated_data
-                if rank == 0:
-                    print('**********All Positive Samples: ', data.filter(
-                        lambda example: example['label'] == 1,
-                        cache_file_name=config.cache_data_path+'/all_pos_cache_'+str(config.cycle)).num_rows)
-                    print('**********All Negtive Samples: ', data.filter(
-                        lambda example: example['label'] == 0,
-                        cache_file_name=config.cache_data_path+'/all_neg_cache_'+str(config.cycle)).num_rows)
+    random_list = random.sample(range(labeled_data.num_rows), 10)
+    for i in random_list:
+        print('Labeled Examples: {}'.format(labeled_data[i]))
+    random_list = random.sample(range(generated_data.num_rows), 10)
+    for i in random_list:
+        print('Generated Examples: {}'.format(generated_data[i]))
 
-            elif attri == 'gen' or attri == 'gen_en':
-                if rank > 0:
-                    print(
-                        f'Rank {rank} waiting for main process to perform the filtering')
-                    torch.distributed.barrier()
+    if attri == 'dis':
+        data = set_dis_dataset(labeled_data, generated_data)
 
-                data = generated_data.filter(
-                    lambda example: example['label'] == 1,
-                    cache_file_name=config.cache_data_path+'/gen2gen_cache_'+str(config.cycle))
+    elif attri == 'gen':
+        data = set_gen_dataset(labeled_data, generated_data)
 
-                if rank == 0:
-                    torch.distributed.barrier()
+    test_data = datasets.Dataset.from_json(config.data_path + '/test_public.json')
+    
+    if attri == 'gen':
+        train_dataset = SimGanDataset(data=data, is_gen=True)
+        val_dataset = SimGanDataset(data=test_data, tokenizer=None, predict=True, is_gen=True)
+    
+    elif attri == 'dis':
+        data = data.map(preprocess)
+        test_data = test_data.map(preprocess)
 
-        elif use_gen and use_label:
-            labeled_data = load_data(config, rank, is_labeled=True)
-            generated_data = load_data(
-                config, rank, is_labeled=False, attri=attri)
+        train_dataset = SimGanDataset(data=data, tokenizer=dis_tokenizer)
+        val_dataset = SimGanDataset(
+            data=test_data, tokenizer=dis_tokenizer, predict=True)
 
-            if rank == 0:
-                random_list = random.sample(range(labeled_data.num_rows), 10)
-                for i in random_list:
-                    print('Labeled Examples: {}'.format(labeled_data[i]))
-                random_list = random.sample(range(generated_data.num_rows), 10)
-                for i in random_list:
-                    print('Generated Examples: {}'.format(generated_data[i]))
+    print('**********Train Data: ', len(train_dataset))
+    print('**********Test Data: ', len(val_dataset))
 
-            if attri == 'dis':
-                data = set_dis_dataset(
-                    config, rank, labeled_data, generated_data)
-
-            elif attri == 'gen' or attri == 'gen_en':
-                data = set_gen_dataset(
-                    config, rank, labeled_data, generated_data)
-
-    if config.pretrain_dis:
-        if config.zero_shot:
-            train_data = datasets.load_from_disk(
-                '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled_train_' + config.data_name)
-            test_data = datasets.load_from_disk(
-                '/cognitive_comp/wutong/source/sim_data/similarity_data/labeled_test_' + config.data_name)
-        else:
-            train_data = datasets.load_from_disk(
-                config.lab_data_path + config.data_name + '_train_ds')
-            test_data = datasets.load_from_disk(
-                config.test_data_path + config.data_name)
-        train_dataset = SimGanDataset(data=train_data)
-        val_dataset = SimGanDataset(data=test_data)
-
-    elif config.pretrain_gen:
-        train_data = datasets.load_from_disk(
-            '/cognitive_comp/wutong/source/sim_data/similarity_data_en/pre_train')
-        train_dataset = SimGanDataset(data=train_data)
-        test_data = datasets.load_from_disk(
-            '/cognitive_comp/wutong/source/sim_data/similarity_data_en/pre_val')
-        val_dataset = SimGanDataset(data=test_data)
-
-    else:
-        test_data = datasets.Dataset.from_json(
-            '/cognitive_comp/wutong/source/sim_data/raw_data/bustm/test_public.json')
-        
-        if attri == 'gen':
-            train_dataset = SimGanDataset(data=data, is_gen=True)
-            val_dataset = SimGanDataset(
-                data=test_data, tokenizer=None, predict=True, is_gen=True)
-        
-        elif attri == 'dis':
-            if rank > 0:
-                print(f'Rank {rank} waiting for main process to perform the mapping')
-                torch.distributed.barrier()
-            data = data.map(preprocess, cache_file_name=config.cache_data_path+'/train_cache'+str(config.cycle))
-            test_data = test_data.map(preprocess, 
-                                    cache_file_name=config.cache_data_path+'/test_cache'+str(config.cycle))
-            if rank == 0:
-                torch.distributed.barrier()
-
-            train_dataset = SimGanDataset(data=data, tokenizer=dis_tokenizer)
-            val_dataset = SimGanDataset(
-                data=test_data, tokenizer=dis_tokenizer, predict=True)
-
-    if rank == 0:
-        print('**********Train Data: ', len(train_dataset))
-        print('**********Test Data: ', len(val_dataset))
-
-    torch.distributed.barrier()
     return train_dataset, val_dataset
 
 
@@ -511,13 +373,6 @@ def create_dataloader(config, dataset, tokenizer, attri=None, shuffle=True):
         def collate_fn(batch_data):
             return generator_collate_fn(
                 batch_data, tokenizer, config.gen_batch_size, is_train=shuffle)
-
-    elif attri == 'gen_en':
-        batch_size = config.gen_en_batch_size
-
-        def collate_fn(batch_data):
-            return generator_en_collate_fn(
-                batch_data, tokenizer, is_train=shuffle)
 
     dataloader = DataLoader(
         dataset=dataset,
