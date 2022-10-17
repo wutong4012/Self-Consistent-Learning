@@ -58,8 +58,8 @@ do
     fi
 
     echo "RUN test $idx"
-    srun --gres=gpu:1 -o ./job_out/%x-%j-$idx.log -e ./job_out/%x-%j-$idx.err python sim_gen_server.py ++max_thre0=$max_thre0 ++max_thre1=$max_thre1 \
-        ++max_dis_thre=$max_dis_thre ++min_dis_thre=$min_dis_thre ++sentence_num=$sentence_num ++min_thre0=$min_thre0 ++min_thre1=$min_thre1 ++add_thre=$add_thre \
+    srun --gres=gpu:1 -o ./job_out/%x-%j-$idx.log -e ./job_out/%x-%j-$idx.err python sim_gen_server.py ++idx=$idx ++max_thre0=$max_thre0 ++max_thre1=$max_thre1 \
+        ++max_dis_thre=$max_dis_thre ++min_dis_thre=$min_dis_thre ++sentence_num=$sentence_num ++min_thre0=$min_thre0 ++min_thre1=$min_thre1 ++add_thre=$add_thre
     echo "END test $idx"
 
 done
