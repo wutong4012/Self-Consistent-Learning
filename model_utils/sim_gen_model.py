@@ -3,58 +3,44 @@ import json
 import torch
 import torch.nn as nn
 from transformers import (
-    AutoModelForSequenceClassification, OPTForCausalLM)
+    AutoModelForMaskedLM, OPTForCausalLM)
 
 from model_utils.gpt2_modeling import GPT2Model
 
 
 class Discriminator(nn.Module):
 
-    def __init__(self, config) -> None:
+    def __init__(self, config, tokenizer) -> None:
         super().__init__()
+        pt_path = '/cognitive_comp/wutong/source/model_base/pretrained_zh/' + config.bustm_model
+        self.dis = AutoModelForMaskedLM.from_pretrained(pt_path) 
 
-        if config.chinese:
-            self.dis = AutoModelForSequenceClassification.from_pretrained(
-                config.pretrained_zh + config.discriminator_zh, num_labels=2)
-        else:
-            self.dis = AutoModelForSequenceClassification.from_pretrained(
-                config.pretrained_en + config.discriminator_en, num_labels=2)
-        
-        if config.pretrain_dis and not config.warm_up_model:
-            return
+        self.yes_token = tokenizer.encode("是")[1]
+        self.no_token = tokenizer.encode("非")[1]
+
+        self.loss_func = torch.nn.CrossEntropyLoss(reduction='mean')
+        self.KL_criterion = torch.nn.KLDivLoss(reduction='batchmean')
+
+        self.temperature = 1
+        self.do_annealing = None
 
         if config.warm_up_model:
             print('Use Warm Up Model...')
             if config.cycle == 0 or config.cycle == -1:
-                if config.zero_shot == 1:
-                    if config.chinese:
-                        pt_path = config.pretrained_zh + config.discriminator_zh + '_' + config.data_name + '0.pt'
+                pt_path = '/cognitive_comp/wutong/' + config.model_version
+                state_dict = torch.load(pt_path, map_location='cpu')
+                new_dict = {}
+                for k, v in state_dict.items():
+                    if any([i in k for i in ['bert_encoder.']]):
+                        new_dict[k[len('bert_encoder.'):]] = v
                     else:
-                        pt_path = config.pretrained_en + config.discriminator_en + '_' + config.data_name + '0.pt'
-                else:
-                    if config.chinese:
-                        pt_path = config.pretrained_zh + config.discriminator_zh + '_' + config.data_name + '.pt'
-                    else:
-                        pt_path = config.pretrained_en + config.discriminator_en + '_' + config.data_name + '.pt'
+                        continue
+                self.dis.load_state_dict(new_dict)
                 print(f'The warm up model path is {pt_path}!')
             else:
                 pt_path = config.ckpt_model_path + \
                     f'/discriminator_cycle_{config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt'
 
-            new_dict = {}
-            state_dict = torch.load(pt_path, map_location='cpu')['module']
-            for k, v in state_dict.items():
-                if any([i in k for i in ['module.discriminator.dis.']]):
-                    new_dict[k[len('module.discriminator.dis.'):]] = v
-                else:
-                    continue
-            self.dis.load_state_dict(new_dict)
-            
-        
-        else:
-            if config.cycle > 0:
-                pt_path = config.ckpt_model_path + \
-                    f'/discriminator_cycle_{config.cycle}.ckpt/checkpoint/mp_rank_00_model_states.pt'
                 new_dict = {}
                 state_dict = torch.load(pt_path, map_location='cpu')['module']
                 for k, v in state_dict.items():
@@ -62,23 +48,77 @@ class Discriminator(nn.Module):
                         new_dict[k[len('module.discriminator.dis.'):]] = v
                     else:
                         continue
+                pt_path = '/cognitive_comp/wutong/source/model_base/pretrained_zh/' + config.bustm_model  ## 
+                self.dis = AutoModelForMaskedLM.from_pretrained(pt_path)
                 self.dis.load_state_dict(new_dict)
         
         print(f'Cycle {config.cycle}: The Discriminator Load Successfully !\n')
 
-    def forward(self, dis_input_ids, labels):
-        attention_mask = (dis_input_ids > 0).int()
-        # [CLS] -> [bs, hz]
-        dis_output = self.dis.forward(
-            input_ids=dis_input_ids,
-            attention_mask=attention_mask,
-            labels=labels
-        )
+    def forward(self,
+                input_ids,
+                attention_mask,
+                token_type_ids,
+                position_ids=None,
+                mlmlabels=None, 
+                clslabels=None, 
+                clslabels_mask=None, 
+                mlmlabels_mask=None,
+                bt_label_idx=None,
+                t_probs=None,
+                t_logits=None,
+                do_soft_label=False,
+                annealing_coeff=0,
+                do_cc_loss=False,
+                ):
+                
+        batch_size,seq_len=input_ids.shape
+        outputs = self.dis(input_ids=input_ids,
+                            attention_mask=attention_mask,
+                            position_ids=position_ids,
+                            token_type_ids=token_type_ids,
+                            labels=mlmlabels)  # (bsz, seq, dim)
+        mask_loss = outputs.loss
+        mlm_logits = outputs.logits
+        cls_logits = mlm_logits[:,:,self.yes_token].view(-1,seq_len)+clslabels_mask
         
-        if labels == None:
-            return dis_output.logits
+        loss_ce = 0.0
 
-        return dis_output.loss, dis_output.logits
+        if mlmlabels == None:
+            probs = torch.nn.functional.softmax(cls_logits, dim=-1)
+            # label_idx = torch.stack([sample[:-1] for sample in bt_label_idx], dim=0)
+            # probs_ = torch.gather(probs, dim=1, index=label_idx) / self.temperature
+            return probs
+        else:
+            cls_loss = self.loss_func(cls_logits,clslabels)
+            loss_total = mask_loss+cls_loss
+            # all_loss = mask_loss
+        
+        # 计算kl 散度loss
+        kl_loss = 0.0
+        if do_soft_label:
+            probs_ = []
+            probs = torch.nn.functional.softmax(cls_logits, dim=-1)
+            
+            label_idx = torch.stack([sample[:-1] for sample in bt_label_idx], dim=0)
+                
+            probs_ = torch.gather(probs, dim=1, index=label_idx) / self.temperature
+            
+            kl_loss = self.KL_criterion(probs_.log(), t_probs/self.temperature) 
+            
+            if self.do_annealing:
+                loss_total = annealing_coeff * cls_loss + (1 - annealing_coeff) * kl_loss + mask_loss
+            else:
+                loss_total += kl_loss
+
+        ret = {
+            'loss_total': loss_total,
+            'mlm_logits': mlm_logits,
+            'cls_logits': cls_logits,
+            'loss_ce': loss_ce,
+            'kl_loss': kl_loss
+        }
+        
+        return ret
 
 
 class Generator(nn.Module):

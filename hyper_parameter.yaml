@@ -1,7 +1,7 @@
 seed: 42
 exp_dir: /cognitive_comp/wutong/similarity_generation/experiments/
-txl_config_path: /cognitive_comp/wutong/similarity_generation/model_utils/txl_5B_config.json
-txl_model_path: /cognitive_comp/wutong/source/model_base/model_zh/txl_zh_5.0B.pt
+txl_config_path: /cognitive_comp/wutong/similarity_generation/model_utils/txl_1.1B_config.json
+txl_model_path: /cognitive_comp/wutong/source/model_base/model_zh/txl_zh_1.1B.pt
 opt_model_path: /cognitive_comp/wutong/source/model_base/model_en/
 
 pretrained_zh: /cognitive_comp/wutong/source/model_base/pretrained_zh/
@@ -22,12 +22,12 @@ std_scale: 1.2
 repetition_penalty: 1.0
 
 gen_repeat_times: 1  # 每条句子重复生成的次数-zh
-dis_batch_size: 32  # en-24 / zh-128  ####
-gen_batch_size: 2
-gen_big_batch_size: 30
+dis_batch_size: 128  # en-24 / zh-128  ####  256 / 384
+gen_batch_size: 16
+gen_big_batch_size: 200
 gen_en_batch_size: 24  # pre-4 / 24
-pre_gen_bs: 100  # 100-en / zh-512
-pre_dis_bs: 96    # en-96 / zh-384
+pre_gen_bs: 1024  # 100-en / zh-512
+pre_dis_bs: 1024    # en-96 / zh-384
 
 val_me: False
 val_check: False
@@ -42,6 +42,8 @@ consistency: 0
 dis_hidden_size: 1024
 discriminator_en: albert_xxlarge
 discriminator_zh: albert_xxlarge
+bustm_model: macbert_large_mc   # ernie_base_mc / macbert_large_mc
+model_version: finetune_large.bin   # finetune_large.bin / finetune_base.bin
 
 learning_rate: 2e-5 ##
 cycle_num: 10  ####

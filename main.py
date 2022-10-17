@@ -19,7 +19,7 @@ def set_trainer(config, ckpt_callback, early_stopping):
     lr_callback = LearningRateMonitor(logging_interval='step')
     trainer = Trainer(
         default_root_dir=config.exp_dir,
-        gpus=8,  ##
+        gpus=1,  ##
         strategy=DeepSpeedStrategy(
             offload_optimizer=True,
             logging_batch_size_per_gpu=1),

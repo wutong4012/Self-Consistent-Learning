@@ -21,12 +21,13 @@ class DisSystem(LightningModule):
     def set_dis_dataset(self):
         self.train_dataset, self.val_dataset = \
             set_dataset(self.config, use_label=self.config.dis_use_label,
-                        use_gen=True, attri='dis', rank=self.global_rank)
+                        use_gen=True, attri='dis', rank=self.global_rank, 
+                        dis_tokenizer=self.dis_tokenizer)
 
     def _set_tokenizers_and_models(self):
         if self.config.chinese:
             self.dis_tokenizer = AutoTokenizer.from_pretrained(
-                self.config.pretrained_zh + self.config.discriminator_zh)
+                '/cognitive_comp/wutong/source/model_base/pretrained_zh/' + self.config.bustm_model)
         
         else:
             if self.config.discriminator_en == 'albert_xxlarge':
@@ -36,7 +37,7 @@ class DisSystem(LightningModule):
                 self.dis_tokenizer = AutoTokenizer.from_pretrained(
                     self.config.pretrained_en + self.config.discriminator_en)
         
-        self.discriminator = Discriminator(self.config)
+        self.discriminator = Discriminator(self.config, self.dis_tokenizer)
 
     def train_dataloader(self):
         if self.global_rank == 0:
@@ -83,39 +84,56 @@ class DisSystem(LightningModule):
 
     def training_step(self, batch, batch_ids):
         torch.cuda.empty_cache()
-        loss, _ = self.discriminator.forward(
-            batch['dis_text_input_ids'].cuda(),
-            batch['labels'].cuda(),
-        )
-        self.log('dis_train_loss', loss, on_step=True, on_epoch=True)
+        ret = self.discriminator.forward(
+                input_ids=batch['input_ids'].cuda(),
+                attention_mask=batch['attention_mask'].cuda(),
+                token_type_ids=batch['token_type_ids'].cuda(),
+                position_ids=batch['position_ids'].cuda(),
+                mlmlabels=batch['mlmlabels'].cuda(),
+                clslabels=batch['clslabels'].cuda(),
+                clslabels_mask=batch['clslabels_mask'].cuda(),
+                mlmlabels_mask=batch['mlmlabels_mask'].cuda(),
+            )
+        self.log('dis_train_loss', ret['loss_total'], on_step=True, on_epoch=True)
 
-        return loss
+        return ret['loss_total']
 
     def validation_step(self, batch, batch_ids):
         torch.cuda.empty_cache()
-        loss, logits = self.discriminator.forward(
-            batch['dis_text_input_ids'].cuda(),
-            batch['labels'].cuda()
-        )
-        self.log('dis_val_loss', loss.item())
+        ret = self.discriminator.forward(
+                input_ids=batch['input_ids'].cuda(),
+                attention_mask=batch['attention_mask'].cuda(),
+                token_type_ids=batch['token_type_ids'].cuda(),
+                position_ids=batch['position_ids'].cuda(),
+                mlmlabels=batch['mlmlabels'].cuda(),
+                clslabels=batch['clslabels'].cuda(),
+                clslabels_mask=batch['clslabels_mask'].cuda(),
+                mlmlabels_mask=batch['mlmlabels_mask'].cuda(),
+            )
+        self.log('dis_val_loss', ret['loss_total'])
         
-        predictions = torch.argmax(logits, dim=1)
-        f1 = f1_score(batch['labels'].cpu(), predictions.cpu())
-        self.log('dis_f1_score', f1)
+        # predictions = torch.argmax(ret['cls_logits', dim=1)
+        # f1 = f1_score(batch['labels'].cpu(), predictions.cpu())
+        # self.log('dis_f1_score', f1)
 
-        return loss
+        return ret['loss_total']
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         torch.cuda.empty_cache()
 
         with torch.no_grad():
             self.discriminator.to('cuda').eval()
-            logits = self.discriminator.forward(
-                dis_input_ids=batch['input_ids'].cuda(), labels=None)
-            logits = torch.softmax(logits, dim=1)
+            prob = self.discriminator.forward(
+                input_ids=batch['input_ids'].cuda(),
+                attention_mask=batch['attention_mask'].cuda(),
+                token_type_ids=batch['token_type_ids'].cuda(),
+                position_ids=batch['position_ids'].cuda(),
+                clslabels_mask=batch['clslabels_mask'].cuda(),
+                # bt_label_idx=batch['label_idx'].cuda()
+            )
 
         return {
-            'text1': batch['text1'],
-            'text2': batch['text2'],
-            'logits': logits,
+            'sentence1': batch['sentence1'],
+            'sentence2': batch['sentence2'],
+            'prob': prob,
         }

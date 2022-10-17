@@ -202,69 +202,99 @@
 # done
 
 
-for idx in {1..2}
+for idx in {0..4}
 do
     if [ "$idx" == "0" ]; then
-        data_name='mrpc'
-        discriminator_en='albert_xxlarge'
         max_thre0=0.95
-        min_thre0=0.8
+        min_thre0=0.9
         max_thre1=0.95
-        min_thre1=0.8
+        min_thre1=0.9
         max_dis_thre=0.95
-        min_dis_thre=0.8
-        sentence_num=4000
-        top_p=0.95
-        cycle_num=10
-        learning_rate=2e-5
-        add_thre=0.05
-        zero_shot=1
-        chinese=0
-        opt_name='opt-2.7b'
-
-    elif [ "$idx" == "1" ]; then
-        data_name='mrpc'
-        discriminator_en='albert_xxlarge'
-        max_thre0=0.95
-        min_thre0=0.8
-        max_thre1=0.95
-        min_thre1=0.8
-        max_dis_thre=0.95
-        min_dis_thre=0.8
-        sentence_num=4000
-        top_p=0.95
-        cycle_num=10
-        learning_rate=2e-5
-        add_thre=0.05
-        zero_shot=1
-        chinese=0
-        opt_name='opt-350m'
-
-    elif [ "$idx" == "2" ]; then
-        data_name='mrpc'
-        discriminator_en='albert_xxlarge'
-        max_thre0=0.8
-        min_thre0=0.6
-        max_thre1=0.8
-        min_thre1=0.6
-        max_dis_thre=0.8
-        min_dis_thre=0.6
+        min_dis_thre=0.85
         sentence_num=3000
         top_p=0.95
-        cycle_num=10
-        learning_rate=5e-6
-        add_thre=1.0
+        cycle_num=5
+        learning_rate=1e-6
+        add_thre=0.01
         zero_shot=0
-        chinese=0
-        opt_name='opt-350m'
+        chinese=1
+        bustm_model='macbert_large_mc'
+        model_version='finetune_large.bin'
+
+    elif [ "$idx" == "1" ]; then
+        max_thre0=0.95
+        min_thre0=0.9
+        max_thre1=0.95
+        min_thre1=0.9
+        max_dis_thre=0.95
+        min_dis_thre=0.85
+        sentence_num=4000
+        top_p=0.95
+        cycle_num=5
+        learning_rate=1e-6
+        add_thre=0.01
+        zero_shot=0
+        chinese=1
+        bustm_model='macbert_large_mc'
+        model_version='finetune_large.bin'
+
+    elif [ "$idx" == "2" ]; then
+        max_thre0=0.95
+        min_thre0=0.9
+        max_thre1=0.95
+        min_thre1=0.9
+        max_dis_thre=0.95
+        min_dis_thre=0.85
+        sentence_num=2000
+        top_p=0.95
+        cycle_num=5
+        learning_rate=1e-6
+        add_thre=0.01
+        zero_shot=0
+        chinese=1
+        bustm_model='macbert_large_mc'
+        model_version='finetune_large.bin'
+
+    elif [ "$idx" == "3" ]; then
+        max_thre0=0.95
+        min_thre0=0.9
+        max_thre1=0.95
+        min_thre1=0.9
+        max_dis_thre=0.95
+        min_dis_thre=0.85
+        sentence_num=2500
+        top_p=0.95
+        cycle_num=5
+        learning_rate=1e-6
+        add_thre=0.01
+        zero_shot=0
+        chinese=1
+        bustm_model='macbert_large_mc'
+        model_version='finetune_large.bin'
+
+    elif [ "$idx" == "4" ]; then
+        max_thre0=0.95
+        min_thre0=0.9
+        max_thre1=0.95
+        min_thre1=0.9
+        max_dis_thre=0.95
+        min_dis_thre=0.85
+        sentence_num=3500
+        top_p=0.95
+        cycle_num=5
+        learning_rate=1e-6
+        add_thre=0.01
+        zero_shot=0
+        chinese=1
+        bustm_model='macbert_large_mc'
+        model_version='finetune_large.bin'
 
     fi
 
     echo "RUN test $idx"
-    srun --gres=gpu:8 -o ./job_out/%x-%j-$idx.log -e ./job_out/%x-%j-$idx.err python main.py  ++idx=$idx ++data_name=$data_name ++max_thre0=$max_thre0 ++max_thre1=$max_thre1 \
+    srun --gres=gpu:1 -o ./job_out/%x-%j-$idx.log -e ./job_out/%x-%j-$idx.err python main.py  ++idx=$idx ++max_thre0=$max_thre0 ++max_thre1=$max_thre1 \
         ++max_dis_thre=$max_dis_thre ++min_dis_thre=$min_dis_thre ++sentence_num=$sentence_num ++min_thre0=$min_thre0 ++min_thre1=$min_thre1 ++zero_shot=$zero_shot \
-        ++discriminator_en=$discriminator_en ++cycle_num=$cycle_num ++chinese=$chinese ++top_p=$top_p ++learning_rate=$learning_rate \
-        ++add_thre=$add_thre ++opt_name=$opt_name
+        ++cycle_num=$cycle_num ++chinese=$chinese ++top_p=$top_p ++learning_rate=$learning_rate ++add_thre=$add_thre ++bustm_model=$bustm_model ++model_version=$model_version
     echo "END test $idx"
 
 done
