@@ -2,7 +2,7 @@ import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import gc
-import yaml
+from omegaconf import OmegaConf
 from collections import defaultdict
 
 import torch
@@ -105,13 +105,9 @@ def server_func(data_path, dis_ckpt_path):
 
     Args:
         data_path (_type_): 文件夹下包含train.json和test_public.json
-        dis_ckpt_path (_type_): 保存的pytorch.bin文件
+        dis_ckpt_path (_type_): 保存的finetune.bin文件
     """
-    file = open('./hyper_parameter.yaml', 'r', encoding='utf-8')
-    config = yaml.load(file.read(), Loader=yaml.Loader)
-    file.close()
-    
-    
+    config = OmegaConf.load('./hyper_parameter.yaml')
     config.data_path = data_path
     config.dis_ckpt_path = dis_ckpt_path
     
@@ -119,8 +115,8 @@ def server_func(data_path, dis_ckpt_path):
     torch.backends.cudnn.benchmark = True
     seed_everything(config.seed)
     
-    config.ckpt_model_path += str(config.idx)
-    config.sim_data_path += str(config.idx)
+    # config.ckpt_model_path += str(config.idx)
+    # config.sim_data_path += str(config.idx)
     
     curr_acc = 0
     for idx in range(config.cycle, config.cycle_num):
