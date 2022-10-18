@@ -9,7 +9,7 @@ dis_model_path: /cognitive_comp/wutong/source/model_base/pretrained_zh/macbert_l
 ckpt_model_path: /cognitive_comp/wutong/similarity_generation/experiments/lightning_logs/checkpoints/
 
 data_path: /cognitive_comp/wutong/source/sim_data/raw_data/bustm
-dis_ckpt_path: /cognitive_comp/wutong/finetune_large_dev.bin
+dis_ckpt_path: /cognitive_comp/wutong/finetune_large.bin
 
 top_k: 0
 top_p: 0.95
@@ -22,7 +22,7 @@ pre_gen_bs: 1024
 pre_dis_bs: 512
 
 max_thre0: 0.95
-min_thre0: 0.9
+min_thre0: 0.7
 max_thre1: 0.95
 min_thre1: 0.9
 max_dis_thre: 0.95

@@ -115,9 +115,6 @@ def server_func(data_path, dis_ckpt_path):
     torch.backends.cudnn.benchmark = True
     seed_everything(config.seed)
     
-    # config.ckpt_model_path += str(config.idx)
-    # config.sim_data_path += str(config.idx)
-    
     curr_acc = 0
     for idx in range(config.cycle, config.cycle_num):
         config.cycle = idx
@@ -128,7 +125,7 @@ def server_func(data_path, dis_ckpt_path):
         discriminator_cycle(config)
         gc.collect()
         
-        if config.cycle > 0:
+        if config.cycle >= 0:
             is_continue, curr_acc = check_acc(config, last_acc=curr_acc)
             if not is_continue:
                 break
