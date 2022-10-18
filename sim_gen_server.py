@@ -131,9 +131,11 @@ def server_func(data_path, dis_ckpt_path):
                 break
     
     print('Cylce Over!')
-    return config.ckpt_model_path + \
-        f'/discriminator_cycle_{config.cycle-1}.ckpt/checkpoint/mp_rank_00_model_states.pt'
+    if config.cycle > 1:
+        return config.ckpt_model_path + \
+            f'/discriminator_cycle_{config.cycle-1}.ckpt/checkpoint/mp_rank_00_model_states.pt'
 
 
-print(server_func(data_path='/cognitive_comp/wutong/source/sim_data/raw_data/bustm',
-                  dis_ckpt_path = '/cognitive_comp/wutong/finetune_large_dev.bin'))
+if __name__ == '__main__':
+    print(server_func(data_path='/cognitive_comp/wutong/source/sim_data/raw_data/bustm',
+                      dis_ckpt_path = '/cognitive_comp/wutong/finetune_large.bin'))
