@@ -1,9 +1,8 @@
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 import gc
-import hydra
+import yaml
 from collections import defaultdict
 
 import torch
@@ -11,6 +10,7 @@ from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.strategies.deepspeed import DeepSpeedStrategy
 from pytorch_lightning.callbacks import (ModelCheckpoint, EarlyStopping)
 
+from utils import check_acc
 from system.gen_system import GenSystem
 from system.dis_system import DisSystem     
 from data_utlis.dist_gather import all_gather 
@@ -100,8 +100,21 @@ def discriminator_cycle(config):
     dis_postprocess(dis_output, config)
 
 
-@hydra.main(config_path='./', config_name='hyper_parameter')
-def run(config):
+def server_func(data_path, dis_ckpt_path):
+    """_summary_
+
+    Args:
+        data_path (_type_): 文件夹下包含train.json和test_public.json
+        dis_ckpt_path (_type_): 保存的pytorch.bin文件
+    """
+    file = open('./hyper_parameter.yaml', 'r', encoding='utf-8')
+    config = yaml.load(file.read(), Loader=yaml.Loader)
+    file.close()
+    
+    
+    config.data_path = data_path
+    config.dis_ckpt_path = dis_ckpt_path
+    
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
     seed_everything(config.seed)
@@ -109,6 +122,7 @@ def run(config):
     config.ckpt_model_path += str(config.idx)
     config.sim_data_path += str(config.idx)
     
+    curr_acc = 0
     for idx in range(config.cycle, config.cycle_num):
         config.cycle = idx
         print('**********Cycle: {}**********'.format(config.cycle))
@@ -117,6 +131,16 @@ def run(config):
         gc.collect()
         discriminator_cycle(config)
         gc.collect()
+        
+        if config.cycle > 0:
+            is_continue, curr_acc = check_acc(config, last_acc=curr_acc)
+            if not is_continue:
+                break
+    
+    print('Cylce Over!')
+    return config.ckpt_model_path + \
+        f'/discriminator_cycle_{config.cycle-1}.ckpt/checkpoint/mp_rank_00_model_states.pt'
 
 
-run()
+print(server_func(data_path='/cognitive_comp/wutong/source/sim_data/raw_data/bustm',
+                  dis_ckpt_path = '/cognitive_comp/wutong/finetune_large_dev.bin'))

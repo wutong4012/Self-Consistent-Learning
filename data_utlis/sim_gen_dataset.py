@@ -276,7 +276,7 @@ def preprocess_gen_data(sim_dataset):
 
 def load_data(config, is_labeled=False, is_score=False, attri=None):
     if is_labeled:
-        sim_dataset = datasets.Dataset.from_json(config.data_path + '/train.json')  ### data_path
+        sim_dataset = datasets.Dataset.from_json(config.data_path + '/train_0.json')  ### data_path
         sim_dataset = sim_dataset.remove_columns(['id'])
         feats = datasets.Features({"sentence1": datasets.Value('string'),
                                    "sentence2": datasets.Value('string'),

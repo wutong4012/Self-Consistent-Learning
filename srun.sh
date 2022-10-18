@@ -3,57 +3,57 @@
 # -N 1 --gres=gpu:1 --ntasks-per-node=1 --cpus-per-task=30 -x 
 
 
-for idx in {0..4}
+for idx in {0..0}
 do
     if [ "$idx" == "0" ]; then
         max_thre0=0.95
         min_thre0=0.9
         max_thre1=0.95
         min_thre1=0.9
-        max_dis_thre=0.95
+        max_dis_thre=0.9
         min_dis_thre=0.85
         sentence_num=3000
         add_thre=0.01
 
-    elif [ "$idx" == "1" ]; then
-        max_thre0=0.95
-        min_thre0=0.9
-        max_thre1=0.95
-        min_thre1=0.9
-        max_dis_thre=0.95
-        min_dis_thre=0.85
-        sentence_num=4000
-        add_thre=0.01
+    # elif [ "$idx" == "1" ]; then
+    #     max_thre0=0.95
+    #     min_thre0=0.7
+    #     max_thre1=0.95
+    #     min_thre1=0.9
+    #     max_dis_thre=0.95
+    #     min_dis_thre=0.85
+    #     sentence_num=3000
+    #     add_thre=0.05
 
-    elif [ "$idx" == "2" ]; then
-        max_thre0=0.95
-        min_thre0=0.9
-        max_thre1=0.95
-        min_thre1=0.9
-        max_dis_thre=0.95
-        min_dis_thre=0.85
-        sentence_num=2000
-        add_thre=0.01
+    # elif [ "$idx" == "2" ]; then
+    #     max_thre0=0.95
+    #     min_thre0=0.8
+    #     max_thre1=0.95
+    #     min_thre1=0.9
+    #     max_dis_thre=0.95
+    #     min_dis_thre=0.85
+    #     sentence_num=3000
+    #     add_thre=0.05
 
-    elif [ "$idx" == "3" ]; then
-        max_thre0=0.95
-        min_thre0=0.9
-        max_thre1=0.95
-        min_thre1=0.9
-        max_dis_thre=0.95
-        min_dis_thre=0.85
-        sentence_num=2500
-        add_thre=0.01
+    # elif [ "$idx" == "3" ]; then
+    #     max_thre0=0.95
+    #     min_thre0=0.6
+    #     max_thre1=0.95
+    #     min_thre1=0.8
+    #     max_dis_thre=0.95
+    #     min_dis_thre=0.85
+    #     sentence_num=3000
+    #     add_thre=0.05
 
-    elif [ "$idx" == "4" ]; then
-        max_thre0=0.95
-        min_thre0=0.9
-        max_thre1=0.95
-        min_thre1=0.9
-        max_dis_thre=0.95
-        min_dis_thre=0.85
-        sentence_num=3500
-        add_thre=0.01
+    # elif [ "$idx" == "4" ]; then
+    #     max_thre0=0.95
+    #     min_thre0=0.7
+    #     max_thre1=0.95
+    #     min_thre1=0.8
+    #     max_dis_thre=0.95
+    #     min_dis_thre=0.85
+    #     sentence_num=3000
+    #     add_thre=0.05
 
     fi
 

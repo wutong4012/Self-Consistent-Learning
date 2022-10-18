@@ -1,21 +1,21 @@
 seed: 42
 exp_dir: /cognitive_comp/wutong/similarity_generation/experiments/
 txl_config_path: /cognitive_comp/wutong/similarity_generation/model_utils/txl_1.1B_config.json
-txl_model_path: /cognitive_comp/wutong/source/model_base/model_zh/txl_zh_1.1B.pt
-sp_model_path: /cognitive_comp/wutong/source/model_base/chinese_sentencepiece/cog-pretrain.model
-
-ckpt_model_path: /cognitive_comp/wutong/similarity_generation/experiments/lightning_logs/checkpoints/
 sim_data_path: /cognitive_comp/wutong/source/exp_data/sim_cycle_data/
 
-data_path: /cognitive_comp/wutong/source/sim_data/raw_data/bustm
+txl_model_path: /cognitive_comp/wutong/source/model_base/model_zh/txl_zh_1.1B.pt
+sp_model_path: /cognitive_comp/wutong/source/model_base/chinese_sentencepiece/cog-pretrain.model
 dis_model_path: /cognitive_comp/wutong/source/model_base/pretrained_zh/macbert_large_mc
-dis_ckpt_path: /cognitive_comp/wutong/finetune_large.bin
+ckpt_model_path: /cognitive_comp/wutong/similarity_generation/experiments/lightning_logs/checkpoints/
+
+data_path: /cognitive_comp/wutong/source/sim_data/raw_data/bustm
+dis_ckpt_path: /cognitive_comp/wutong/finetune_large_dev.bin
 
 top_k: 0
 top_p: 0.95
 repetition_penalty: 1.0
 
-dis_batch_size: 128
+dis_batch_size: 64
 gen_batch_size: 6
 gen_big_batch_size: 100
 pre_gen_bs: 1024
