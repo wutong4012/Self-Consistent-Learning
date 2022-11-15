@@ -1,5 +1,6 @@
 import os
 import gc
+import math
 import requests
 from sklearn.model_selection import train_test_split
 
@@ -55,12 +56,20 @@ def multiply_pre_score(config, raw_dataset, rank):
             raw_text1.extend(batch['text1'])
             raw_text2.extend(batch['text2'])
 
-        threshold0 = config.min_thre0 + config.cycle * config.add_thre
-        if threshold0 > config.max_thre0:
-            threshold0 = config.max_thre0
-        threshold1 = config.min_thre1 + config.cycle * config.add_thre
-        if threshold1 > config.max_thre1:
-            threshold1 = config.max_thre1
+        if config.is_cos:
+            threshold0 = (config.max_thre0 - config.min_thre0) / 2 * \
+                math.cos(math.pi / 2 * (config.cycle + 1)) + (config.max_thre0 + config.min_thre0) / 2
+            threshold1 = (config.max_thre1 - config.min_thre1) / 2 * \
+                math.cos(math.pi / 2 * (config.cycle + 1)) + (config.max_thre1 + config.min_thre1) / 2
+        else:
+            # threshold0, threshold1 = config.min_thre0, config.min_thre1
+        
+            threshold0 = config.min_thre0 + (config.cycle * config.cycle) * config.add_thre
+            if threshold0 > config.max_thre0:
+                threshold0 = config.max_thre0
+            threshold1 = config.min_thre1 + (config.cycle * config.cycle) * config.add_thre
+            if threshold1 > config.max_thre1:
+                threshold1 = config.max_thre1
 
         all_logits = torch.cat(all_logits, dim=0)
         assert all_logits.size(0) == len(raw_text1)
@@ -159,9 +168,15 @@ def dis_postprocess(dis_output_dict, config, rank):
     gc.collect()
     torch.cuda.empty_cache()
     
-    dis_threshold = config.min_dis_thre + (config.cycle + 1) * config.add_thre
-    if dis_threshold > config.max_dis_thre:
-        dis_threshold = config.max_dis_thre
+    if config.is_cos:
+        dis_threshold = (config.max_dis_thre - config.min_dis_thre) / 2 * \
+                math.cos(math.pi / 2 * (config.cycle + 1)) + (config.max_dis_thre + config.min_dis_thre) / 2
+    else:
+        # dis_threshold = config.max_dis_thre
+
+        dis_threshold = config.min_dis_thre + ((config.cycle + 1) * (config.cycle + 1)) * config.add_thre
+        if dis_threshold > config.max_dis_thre:
+            dis_threshold = config.max_dis_thre
     if rank == 0:
         print(f'**********Start to Post Process the Scored Data, \
             threshold is {dis_threshold}**********')
